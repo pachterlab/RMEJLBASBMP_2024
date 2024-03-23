@@ -1,14 +1,12 @@
-# Seurat vs Scanpy project
+This is the repository which contains all code for the preprint The impact of package selection and versioning on single-cell RNA-seq analysis by Joseph Rich, Lambda Moses, et al.
 
-This is a project to compare package selection and version control for single-cell RNA-seq analysis.
-
-To run the docker image (based on rocker/rstudio, with installed conda, system packages, and python/R packages):
-docker run -d -p 8787:8787 -e PASSWORD=yourpassword -v /path/to/project:/workspace josephrich98/scrnaseq_packages_and_versioning:1.0
+To run the docker image (based on rocker/rstudio, with installed conda, system packages, R packages, and prebuilt conda environments):
+docker run -d -p 8787:8787 -e PASSWORD=yourpassword -v /path/to/project:/workspace josephrich98/rmejlbasbmp_2024:1.0_seu5
 
 The dockerfile can be found in ./analysis/env
 
 There are two main folders
-- matrix_generation
-- analysis
+- analysis (analysis of Seurat vs. Scanpy, read/cell downsampling, and version control)
+- matrix_generation (count matrix generation from fastq files)
 
 Each folder has its own README.md file with more information.
