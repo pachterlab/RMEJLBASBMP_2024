@@ -1,0 +1,72 @@
+# Function argument and input settings
+analysis_methods: "default" # str["default", "seurat_like", "scanpy_like"]
+data_input: "seurat" # str["default", "seurat", "scanpy"]
+save_data: TRUE
+
+# Input and output path specifications
+project_base_path: "/workspace/analysis"  # also used for locating script files; "/workspace/analysis" for docker image with repository mounted in /workspace; "/content/scrnaseq_packages_and_versioning/analysis" for Google Colab
+data_name: "SC3_v3_NextGem_SI_PBMC_10K"  # str
+seurat_version: "5_0_2"  # str (with _ in place of .)
+scanpy_version: "1_9_5"  # str (with _ in place of .)
+conda_env: "analysis_env"
+
+seu_matrix_generation_method: "kb" # str["kb", "cellranger"]  # also used for loading data
+seu_matrix_generation_method_version: "0_28_0"  # str (with _ in place of .)
+
+seu_cell_fraction_after_downsampling: "1_0" # fraction of cells after downsampling - any number from (0,1.0] (with _ in place of .)   # also used for performing cell downsampling
+seu_read_fraction_after_downsampling: "1_0" # fraction of reads after downsampling - any number from (0,1.0] (with _ in place of .)
+seu_read_downsample_seed: 0 # random seqtk seed for downsampling reads - 0 for no downsampling, integer >1 for downsampled seed
+seu_cell_downsample_seed: 0 # Sets the global R session seed during cell downsampling (does not affect the rest of the global R session)
+
+scan_matrix_generation_method: "kb" # str["kb", "cellranger"]  # also used for loading data
+scan_matrix_generation_method_version: "0_28_0"  # str (with _ in place of .)
+
+scan_cell_fraction_after_downsampling: "1_0" # fraction of cells after downsampling - any number from (0,1.0] (with _ in place of .)   # also used for performing cell downsampling
+scan_read_fraction_after_downsampling: "1_0" # fraction of reads after downsampling - any number from (0,1.0] (with _ in place of .)
+scan_read_downsample_seed: 0 # random seqtk seed for downsampling reads - 0 for no downsampling, integer >1 for downsampled seed
+scan_cell_downsample_seed: 0 # Sets the global R session seed during cell downsampling (does not affect the rest of the global R session)
+
+seu_data_path: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}/{seu_matrix_generation_method}{seu_matrix_generation_method_version}/frac{seu_read_fraction_after_downsampling}_seed{seu_read_downsample_seed}")
+scan_data_path: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}/{scan_matrix_generation_method}{scan_matrix_generation_method_version}/frac{scan_read_fraction_after_downsampling}_seed{scan_read_downsample_seed}")
+
+
+# Specifications for downloading data
+doi: ""  # For downloading from CaltechDATA (not yet implemented)
+seu_file_link: "https://caltech.box.com/shared/static/cpe1z865jthijpo0ojwzxrjnshc9xioj.gz"  # For downloading from Box
+scan_file_link: "https://caltech.box.com/shared/static/cpe1z865jthijpo0ojwzxrjnshc9xioj.gz"  # For downloading from Box
+data_path_root: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}")
+seu_data_name_from_download: "" # "" for default - glue::glue("{seu_matrix_generation_method}{seu_matrix_generation_method_version}_frac{seu_read_fraction_after_downsampling}_seed{seu_read_downsample_seed}")
+scan_data_name_from_download: "" # "" for default - glue::glue("{scan_matrix_generation_method}{scan_matrix_generation_method_version}_frac{scan_read_fraction_after_downsampling}_seed{scan_read_downsample_seed}")
+
+
+# Custom parameters
+inflection_UMI_manual: "" # number >=0; or "" to have automatic selection
+
+min_cells: 3
+min_features: 200
+
+max_n_genes_by_counts_scanpy: 12000 # default 2500
+max_pct_mct: 20 # default 5
+seu_num_pcs: 50 # number 1-50; or NULL to select after elbow plot visualization
+scan_num_pcs: 50
+umap_knn_k: 50
+umap_leiden_clustering_resolution: 0.8
+
+pca_seed_seu: 42
+pca_seed_scan: 0
+use_seu_knn_custom_seed: FALSE
+knn_seed_seu: 0
+knn_seed_scan: 0
+clustering_seed_seu: 0
+clustering_seed_scan: 0
+umap_seed_seu: 42
+umap_seed_scan: 0
+umap_leiden_seed_seu: 42
+umap_leiden_seed_scan: 42
+umap_umap_seed_seu: 42
+umap_umap_seed_scan: 42
+
+dpi: 300
+
+# Output path
+output_base_path: "" # "" for default - glue::glue("{project_base_path}/output/{data_name}/seuratv{seurat_version}_vs_scanpyv{scanpy_version}/methods_{analysis_methods}_input_{data_input}/{matrix_generation_method_full}/cell_fraction_{cell_fraction_after_downsampling}/read_fraction_{read_fraction_after_downsampling}")

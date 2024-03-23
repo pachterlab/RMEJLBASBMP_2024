@@ -1,0 +1,78 @@
+# Function argument and input settings
+data_input: "default"
+save_data: TRUE
+
+scan1_name: "Full"  # Must have no spaces
+scan2_name: "Downsampled_cells"  # Must have no spaces
+
+# Input and output path specifications
+project_base_path: "/workspace/analysis"  # also used for locating script files; "/workspace/analysis" for docker image with repository mounted in /workspace
+data_name: "SC3_v3_NextGem_SI_PBMC_10K"  # str
+scanpy_version: "1_9_5"  # str (with _ in place of .)
+conda_env: "analysis_env"
+
+scan1_matrix_generation_method: "kb" # str["kb", "cellranger"]  # also used for loading data
+scan1_matrix_generation_method_version: "0_28_0"  # str (with _ in place of .)
+
+scan1_cell_fraction_after_downsampling: "1_0" # fraction of cells after downsampling - any number from (0,1.0] (with _ in place of .)   # also used for performing cell downsampling
+scan1_read_fraction_after_downsampling: "1_0" # fraction of reads after downsampling - any number from (0,1.0] (with _ in place of .)
+scan1_read_downsample_seed: 0 # random seqtk seed for downsampling reads - 0 for no downsampling, integer >1 for downsampled seed
+scan1_cell_downsample_seed: 0 # Sets the global R session seed during cell downsampling (does not affect the rest of the global R session)
+
+
+scan2_matrix_generation_method: "kb" # str["kb", "cellranger"]  # also used for loading data
+scan2_matrix_generation_method_version: "0_28_0"  # str (with _ in place of .)
+
+scan2_cell_fraction_after_downsampling: "0_16" # fraction of cells after downsampling - any number from (0,1.0] (with _ in place of .)   # also used for performing cell downsampling
+scan2_read_fraction_after_downsampling: "1_0" # fraction of reads after downsampling - any number from (0,1.0] (with _ in place of .)
+scan2_read_downsample_seed: 0 # random seqtk seed for downsampling reads - 0 for no downsampling, integer >1 for downsampled seed
+scan2_cell_downsample_seed: 100 # Sets the global R session seed during cell downsampling (does not affect the rest of the global R session)
+
+scan1_data_path: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}/{scan1_matrix_generation_method}{scan1_matrix_generation_method_version}/frac{scan1_read_fraction_after_downsampling}_seed{scan1_read_downsample_seed}")
+scan2_data_path: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}/{scan2_matrix_generation_method}{scan2_matrix_generation_method_version}/frac{scan2_read_fraction_after_downsampling}_seed{scan2_read_downsample_seed}")
+
+
+# Specifications for downloading data
+doi: ""  # For downloading from CaltechDATA (not yet implemented)
+scan1_file_link: "https://caltech.box.com/shared/static/cpe1z865jthijpo0ojwzxrjnshc9xioj.gz"  # For downloading from Box
+scan2_file_link: "https://caltech.box.com/shared/static/cpe1z865jthijpo0ojwzxrjnshc9xioj.gz"  # For downloading from Box
+data_path_root: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}")
+scan1_data_name_from_download: "" # "" for default - glue::glue("{scan1_matrix_generation_method}{scan1_matrix_generation_method_version}_frac{scan1_read_fraction_after_downsampling}_seed{scan1_read_downsample_seed}")
+scan2_data_name_from_download: "" # "" for default - glue::glue("{scan2_matrix_generation_method}{scan2_matrix_generation_method_version}_frac{scan2_read_fraction_after_downsampling}_seed{scan2_read_downsample_seed}")
+
+
+# Custom parameters
+scan1_inflection_UMI_manual: "" # number >=0; or NULL to have automatic selection, especially necessary for lower fracs (e.g., 30 for frac=0.02, 20 for frac=0.01)
+scan2_inflection_UMI_manual: "" # number >=0; or NULL to have automatic selection, especially necessary for lower fracs (e.g., 30 for frac=0.02, 20 for frac=0.01)
+
+scan1_min_cells: 3
+scan1_min_features: 200
+
+scan2_min_cells: ""  # "" for what was used in Figures
+scan2_min_features: ""  # "" for what was used in Figures
+
+scan1_max_n_genes_by_counts_scanpy: 12000 # default 2500
+scan2_max_n_genes_by_counts_scanpy: 12000 # default 2500
+max_pct_mct: 20 # default 5
+scan1_num_pcs: 50 # number 1-50; or NULL to select after elbow plot visualization
+scan2_num_pcs: 50
+umap_knn_k: 50
+umap_leiden_clustering_resolution: 0.8
+
+pca_seed1: 42
+pca_seed2: 42
+knn_seed1: 0
+knn_seed2: 0
+clustering_seed1: 0
+clustering_seed2: 0
+umap_seed1: 42
+umap_seed2: 42
+umap_leiden_seed1: 42
+umap_leiden_seed2: 42
+umap_umap_seed1: 42
+umap_umap_seed2: 42
+
+dpi: 300
+
+# Output path
+output_base_path: "" # "" for default - glue::glue("{project_base_path}/output/{data_name}/scanpyv{scanpy_version}/input_{data_input}/{matrix_generation_method_full}/cell_fraction_{cell_fraction_after_downsampling}/read_fraction_{read_fraction_after_downsampling}")

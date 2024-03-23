@@ -1,0 +1,471 @@
+---
+title: "Seurat version comparison"
+output: html_document
+date: "2023-11-15"
+---
+
+Select yaml file
+```{r}
+yaml_file <- "Fig3_seurat"  # Fig3_seurat
+```
+
+Load contents of yaml file into global R environment
+```{r}
+yaml_dir <- glue::glue("{dirname(getwd())}/yaml")
+yaml_file_path <- glue::glue("{yaml_dir}/{yaml_file}.yaml")
+
+source(glue::glue("{dirname(getwd())}/scripts/load_yaml_contents.R"))
+load_yaml_contents(yaml_file_path)
+```
+
+```{r}
+if (seu1_data_path == "") {
+    seu1_data_path <- glue::glue("{data_path_root}/seuratv5/seu.rds")
+}
+
+if (seu2_data_path == "") {
+    seu2_data_path <- glue::glue("{data_path_root}/seuratv4/seu.rds")
+}
+
+if (seu1_markers_data_path == "") {
+    seu1_markers_data_path <- glue::glue("{data_path_root}/seuratv5/markers.rds")
+}
+
+if (seu2_markers_data_path == "") {
+    seu2_markers_data_path <- glue::glue("{data_path_root}/seuratv4/markers.rds")
+}
+
+if (output_base_path == "") {
+    output_base_path <- glue::glue("{project_base_path}/output/{data_name}/seuratv{seurat1_version}_vs_seuratv{seurat2_version}")
+}
+```
+
+R Imports
+```{r}
+seurat_group_names <- list(Seurat1 = seu1_name, Seurat2 = seu2_name)
+
+group1_color <- "#009E73"
+group2_color <- "#CC79A7"
+
+conda_env <- "analysis_env"
+Sys.setenv(RETICULATE_PYTHON = paste("/home/rstudio/.conda/envs", conda_env, "bin/python3.9", sep = "/"))
+library(reticulate)
+use_condaenv(conda_env)
+library(Seurat)
+library(Matrix)
+library(tidyverse)
+library(patchwork)
+library(eulerr)
+library(scattermore)
+library(DropletUtils)
+library(glue)
+library(bluster)
+library(ggforce)
+library(ggplotify)
+library(grid)
+library(gtable)
+library(ggalluvial)
+theme_set(theme_bw())
+
+source(glue("{project_base_path}/scripts/data_analysis_helper.R"))
+source(glue("{project_base_path}/scripts/plotting_and_stats.R"))
+```
+
+Download data if necessary
+```{r}
+if (seuv5_version_control_file_link != "" && (!dir.exists(dirname(seu1_data_path)) || length(list.files(dirname(seu1_data_path))) == 0)) {
+    seu1_data_path_base <- download_box(seuv5_version_control_file_link, seuv5_data_name_from_download, data_path_root)
+    seu1_data_path <- glue("{seu1_data_path_base}/seu.rds")
+    seu1_markers_data_path <- glue("{seu1_data_path_base}/markers.rds")
+}
+
+if (seuv4_version_control_file_link != "" && (!dir.exists(dirname(seu2_data_path)) || length(list.files(dirname(seu2_data_path))) == 0)) {
+    seu2_data_path_base <- download_box(seuv4_version_control_file_link, seuv4_data_name_from_download, data_path_root)
+    seu2_data_path <- glue("{seu2_data_path_base}/seu.rds")
+    seu2_markers_data_path <- glue("{seu2_data_path_base}/markers.rds")
+}
+```
+
+```{python}
+import sys
+sys.path.append(f"{r.project_base_path}/scripts")
+from download_data import *
+
+if not r.doi == "" and (not os.path.exists(os.path.dirname(r.seu1_data_path)) or not os.listdir(os.path.dirname(r.seu1_data_path))):
+    r.seu1_data_path_base = download_and_extract(r.doi, r.seu1_data_name_from_download, r.data_path_root)
+    r.seu1_data_path = f"{r.seu1_data_path_base}/seu.rds"
+    r.seu1_markers_data_path = f"{r.seu1_data_path_base}/markers.rds"
+if not r.doi == "" and (not os.path.exists(os.path.dirname(r.seu2_data_path)) or not os.listdir(os.path.dirname(r.seu2_data_path))):
+    r.seu2_data_path_base = download_and_extract(r.doi, r.seu2_data_name_from_download, r.data_path_root)
+    r.seu2_data_path = f"{r.seu2_data_path_base}/seu.rds"
+    r.seu2_markers_data_path = f"{r.seu2_data_path_base}/markers.rds"
+```
+
+```{r}
+seurat_hvg_flavor <- "vst"
+seu_mean_cutoff <- c(0.1, 8)
+seu_dispersion_cutoff <- c(1, Inf)
+seu_vars_to_regress <- NULL
+seurat_scale_max <- 10
+seu_n_neighbors <- 20
+seurat_clustering_algorithm <- "louvain"
+seu_resolution <- 0.8
+seu_umap_min_dist <- 0.5
+seu_umap_method <- "uwot"
+seu_umap_metric <- "correlation"
+```
+
+Load data
+```{r}
+seu1 <- readRDS(seu1_data_path)
+markers_seu1 <- readRDS(seu1_markers_data_path)
+
+seu2 <- readRDS(seu2_data_path)
+markers_seu2 <- readRDS(seu2_markers_data_path)
+```
+
+```{r}
+output_data_file_paths <- list(
+    markers_seu1 = glue::glue("{output_base_path}/data_files/markers_{seurat1_version}.rds"),
+    markers_seu2 = glue::glue("{output_base_path}/data_files/markers_{seurat2_version}.rds"),
+    markers2 = glue::glue("{output_base_path}/data_files/markers2.rds"),
+    seu1_object = glue::glue("{output_base_path}/data_files/seu1.rds"),
+    seu2_object = glue::glue("{output_base_path}/data_files/seu2.rds")
+)
+
+# FALSE to have no save
+file_paths <- list(
+    filter_arguments = glue::glue("{output_base_path}/stats/filter_stats.txt"),
+    euler_stats_before_QC_file = FALSE, # glue::glue("{output_base_path}/stats/euler_stats_beforeQC.txt"),
+    euler_stats_after_QC_file = glue::glue("{output_base_path}/stats/euler_stats_afterQC.txt"),
+    pca_knn_clustering_umap_file = glue::glue("{output_base_path}/stats/pca_knn_clustering_umap_stats.txt"),
+    de_stats_file = glue::glue("{output_base_path}/stats/de_stats.txt"),
+    upset_cells = glue::glue("{output_base_path}/plots/upset_cells.tiff"),
+    upset_genes = glue::glue("{output_base_path}/plots/upset_genes.tiff"),
+    upset_hvgs = glue::glue("{output_base_path}/plots/upset_hvgs.tiff"),
+    upset_markers_genes_only = glue::glue("{output_base_path}/plots/upset_marker_genes_only.tiff"),
+    upset_markers = glue::glue("{output_base_path}/plots/upset_markers.tiff"),
+    pca_12_overlay_filepath = glue::glue("{output_base_path}/plots/pca_scatterplot_12.tiff"),
+    combined_pc_variance_loadings_plot = glue::glue("{output_base_path}/plots/combined_pc_variance_loadings_plot.tiff"),
+    jaccard_degree_scatterplot = glue::glue("{output_base_path}/plots/jaccard_degree_scatterplot.tiff"),
+    alluvial = glue::glue("{output_base_path}/plots/cluster_alluvial.tiff"),
+    alluvial_legend = glue::glue("{output_base_path}/plots/cluster_alluvial_legend.tiff"),
+    umap_seu1 = glue::glue("{output_base_path}/plots/umap_seu_{seu1_name}.tiff"),
+    umap_seu2 = glue::glue("{output_base_path}/plots/umap_seu_{seu2_name}.tiff"),
+    umap_jaccard_degree_scatterplot = glue::glue("{output_base_path}/plots/umap_jaccard_degree_scatterplot.tiff"),
+    umap_jaccard_knn_density = glue::glue("{output_base_path}/plots/umap_jaccard_knn_density.tiff"),
+    umap_jaccard_knn_density_seu1_facet = glue::glue("{output_base_path}/plots/umap_jaccard_knn_density_seu1_facet.tiff"),
+    umap_jaccard_knn_density_seu2_facet = glue::glue("{output_base_path}/plots/umap_jaccard_knn_density_seu2_facet.tiff"),
+    umap_alluvial = glue::glue("{output_base_path}/plots/umap_alluvial.tiff"),
+    umap_umap_leiden_seu1 = glue::glue("{output_base_path}/plots/umap_umap_leiden_seu1.tiff"),
+    umap_umap_leiden_seu2 = glue::glue("{output_base_path}/plots/umap_umap_leiden_seu2.tiff"),
+    logFC_scatterplot_file_path = glue::glue("{output_base_path}/plots/logFC_scatterplot.tiff"),
+    wilcoxon_scatterplot_file_path = glue::glue("{output_base_path}/plots/wilcoxon_scatterplot.tiff"),
+    logFC_scatterplot_file_path_with_legend = glue::glue("{output_base_path}/plots/logFC_scatterplot_with_legend.tiff"),
+    wilcoxon_scatterplot_file_path_with_legend = glue::glue("{output_base_path}/plots/wilcoxon_scatterplot_with_legend.tiff")
+)
+
+for (path in output_data_file_paths) {
+    dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+}
+
+
+if (save_data) {
+    for (path in output_data_file_paths) {
+        dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+    }
+    
+    for (path in file_paths) {
+        if (is.character(path)) {
+            # Extract the directory part of the path
+            specific_output_path <- dirname(path)
+
+            # Create the directory if it does not exist
+            if (!dir.exists(specific_output_path)) {
+                dir.create(specific_output_path, recursive = TRUE, showWarnings = FALSE)
+            }
+        }
+    }
+    
+    for (file in c(file_paths$euler_stats_after_QC_file, file_paths$pca_knn_clustering_umap_file, file_paths$de_stats_file)) {
+        if (is.character(file)) {
+            sink(file = file, append = FALSE)
+            sink()
+        }
+    }
+} else {
+    for (i in seq_along(file_paths)) {
+        file_paths[[i]] <- FALSE
+    }
+}
+```
+
+Overlaps, PCA
+```{r}
+upset_cell <- make_upset_seurat(group1 = seu1, group2 = seu2, comparison = "Cell", group_names = seurat_group_names, save = file_paths$upset_cells)
+upset_gene <- make_upset_seurat(group1 = seu1, group2 = seu2, comparison = "Gene", group_names = seurat_group_names, save = file_paths$upset_genes)
+upset_cell
+upset_gene
+
+upset_hvg <- make_upset_seurat(seu1, seu2, comparison = "HVG", group_names = seurat_group_names, save = file_paths$upset_hvgs)
+upset_hvg
+
+tot_variance1 <- Misc(Reductions(seu1, "pca"))[["total.variance"]]
+var_explained1 <- Stdev(seu1, reduction = "pca")^2 / tot_variance1
+
+tot_variance2 <- Misc(Reductions(seu2, "pca"))[["total.variance"]]
+var_explained2 <- Stdev(seu2, reduction = "pca")^2 / tot_variance2
+
+eigs_df <- tibble(
+    Seurat1 = var_explained1,
+    Seurat2 = var_explained2,
+    PC = 1:50
+)
+
+combined_pc_variance <- plot_var_explained(eigs_df, npcs = 50, group_names = unlist(seurat_group_names), save = FALSE)
+
+pca_embeddings1 <- Embeddings(seu1, reduction = "pca")
+pca_embeddings2 <- Embeddings(seu2, reduction = "pca")
+
+pca12_plot <- plot_pca_compare(pca_embeddings1, pca_embeddings2, group1_name = "Seurat1", group2_name = "Seurat2", group_labels = unlist(seurat_group_names), save = file_paths$pca_12_overlay_filepath)
+pca12_plot
+
+pca_loadings_seu1 <- Loadings(seu1, reduction = "pca")
+pca_loadings_seu2 <- Loadings(seu2, reduction = "pca")
+
+df_loadings <- make_pc_diffs_df(list(
+    Seurat1 = pca_loadings_seu1,
+    Seurat2 = pca_loadings_seu2
+), npcs = 50)
+
+mean_loadings_diff <- mean(df_loadings$differences[1:3])
+
+if (file_paths$pca_knn_clustering_umap_file != FALSE) {
+    sink(file_paths$pca_knn_clustering_umap_file, split = TRUE, append = TRUE)
+}
+
+print(glue("Mean loading difference of PC1-3: {mean_loadings_diff}"))
+
+if (file_paths$pca_knn_clustering_umap_file != FALSE) {
+    sink()
+}
+
+mylist <- list(
+    Seurat1 = pca_loadings_seu1,
+    Seurat2 = pca_loadings_seu2
+)
+
+loading_diffs <- plot_loading_diffs(df_loadings, save = FALSE)
+
+
+combined_plot <- make_combined_pc_variance_loadings_plot(combined_pc_variance, loading_diffs, save = file_paths$combined_pc_variance_loadings_plot)
+
+combined_plot
+```
+
+KNN
+```{r}
+seu1_inds <- colnames(seu1)
+seu2_inds <- colnames(seu2)
+
+snn_graph_seu1 <- seu1@graphs$RNA_snn
+snn_graph_seu2 <- seu2@graphs$RNA_snn
+
+seu_snn_b1 <- snn_graph_seu1 > 0
+seu_snn_b2 <- snn_graph_seu2 > 0
+
+if (!identical(seu1_inds, seu2_inds)) {
+    seu_snn_b1 <- seu_snn_b1[overlapping_inds, overlapping_inds]
+    seu_snn_b2 <- seu_snn_b2[overlapping_inds, overlapping_inds]
+}
+
+seu1_list <- mat2list(seu_snn_b1)
+seu2_list <- mat2list(seu_snn_b2)
+
+jaccards <- find_jaccards(list(Seurat1 = seu1_list, Seurat2 = seu2_list))
+
+median_jaccard <- median(jaccards$Jaccard)
+
+jaccard_plot <- make_jaccard_plot(jaccards, median_jaccard, save = FALSE)
+
+jaccard_plot
+
+nei_sizes <- tibble(
+    Seurat1 = lengths(seu1_list),
+    Seurat2 = lengths(seu2_list)
+)
+
+nei_pairs <- make_pairwise_df(nei_sizes)
+
+knn_scatterplot <- make_knn_scatterplot(nei_pairs, save = FALSE)
+
+knn_scatterplot
+
+jaccards$degree_ratio <- nei_pairs$value1 / nei_pairs$value2
+jaccards$logged_degree_ratio <- log(jaccards$degree_ratio, base = 2)
+
+jaccards$jaccard_logged <- log(jaccards$Jaccard, base = 2)
+
+median_logged_degree_ratio <- median(jaccards$logged_degree_ratio)
+
+if (file_paths$pca_knn_clustering_umap_file != FALSE) {
+    sink(file_paths$pca_knn_clustering_umap_file, append = TRUE, split = TRUE)
+}
+
+print(glue("Median jaccard of KNN: {median_jaccard}"))
+print(glue("Median log degree ratio of KNN: {median_logged_degree_ratio}"))
+
+if (file_paths$pca_knn_clustering_umap_file != FALSE) {
+    sink()
+}
+
+
+jaccard_degree_scatterplot <- make_snn_jaccard_degree_scatterplot(jaccards, save = file_paths$jaccard_degree_scatterplot)
+jaccard_degree_scatterplot
+
+seu1_clusters <- Idents(seu1)
+seu2_clusters <- Idents(seu2)
+
+seu1_clusters_vector <- as.vector(seu1_clusters)
+seu2_clusters_vector <- as.vector(seu2_clusters)
+ari_value <- mclust::adjustedRandIndex(seu1_clusters_vector, seu2_clusters_vector)
+
+
+if (file_paths$pca_knn_clustering_umap_file != FALSE) {
+    sink(file_paths$pca_knn_clustering_umap_file, append = TRUE, split = TRUE)
+}
+
+print(glue("Adjusted Rand index between clusters: {ari_value}"))
+
+if (file_paths$pca_knn_clustering_umap_file != FALSE) {
+    sink()
+}
+```
+
+Clustering, UMAP
+```{r}
+seu1_clusters <- Idents(seu1)
+seu2_clusters <- Idents(seu2)
+
+df <- tibble(
+    Seurat1 = seu1_clusters,
+    Seurat2 = seu2_clusters
+)
+
+df <- setNames(df, unlist(seurat_group_names))
+
+clus_df_gather <- get_alluvial_df(df)
+
+clus_df_gather2 <- sort_clusters_by_agreement(clus_df_gather, stable_column = seu1_name, reordered_column = seu2_name)
+
+alluvial_plot <- plot_alluvial(clus_df_gather, color_boxes = TRUE, color_bands = FALSE, group1_name = seu1_name, group2_name = seu2_name, save = file_paths$alluvial)
+alluvial_plot_legend <- plot_alluvial(clus_df_gather, color_boxes = TRUE, color_bands = TRUE, alluvial_alpha = 0.5, group1_name = seu1_name, group2_name = seu2_name, save = file_paths$alluvial_legend)
+alluvial_plot
+alluvial_plot_legend
+
+seu1_umap_info <- RunUMAP(seu1, dims = 1:50, min.dist = seu_umap_min_dist, umap.method = seu_umap_method, seed.use = 42, metric = seu_umap_metric)
+seu2_umap_info <- RunUMAP(seu2, dims = 1:50, min.dist = seu_umap_min_dist, umap.method = seu_umap_method, seed.use = 42, metric = seu_umap_metric)
+
+colors_group2 <- find_group2_colors(clus_df_gather, seu1_name, seu2_name)
+
+umap_plots <- plot_umap(group1_umap_info = seu1_umap_info$umap@cell.embeddings, group1_clusters = seu1$seurat_clusters, group2_umap_info = seu2_umap_info$umap@cell.embeddings, group2_clusters = seu2$seurat_clusters, colors_group2 = colors_group2, group1 = seu1_name, group2 = seu2_name, save = c(file_paths$umap_seu1, file_paths$umap_seu2))
+seu1_umap <- umap_plots[[1]]
+seu2_umap <- umap_plots[[2]]
+
+seu1_umap
+seu2_umap
+
+seu1_umap_data <- seu1_umap_info$umap@cell.embeddings
+seu2_umap_data <- seu2_umap_info$umap@cell.embeddings
+
+seu1_umap_knn <- dbscan::kNN(seu1_umap_data, k = 50)
+seu2_umap_knn <- dbscan::kNN(seu2_umap_data, k = 50)
+
+jaccards_all_cells <- calculate_knn_jaccards(seu1_umap_knn$id, seu2_umap_knn$id)
+
+median_jaccard_umap_knn <- median(jaccards_all_cells)
+
+if (file_paths$pca_knn_clustering_umap_file != FALSE) {
+    sink(file_paths$pca_knn_clustering_umap_file, append = TRUE, split = TRUE)
+}
+
+print(glue("Median jaccard of UMAP KNN: {median_jaccard_umap_knn}"))
+
+if (file_paths$pca_knn_clustering_umap_file != FALSE) {
+    sink()
+}
+
+overlapping_inds <- intersect(seu1_inds, seu2_inds)
+
+seu1_cluster_data_filtered <- Idents(seu1)[overlapping_inds]
+seu2_cluster_data_filtered <- Idents(seu2)[overlapping_inds]
+
+jaccards_df <- data.frame(Cells = overlapping_inds, JaccardIndex = jaccards_all_cells, seu1_clusters = seu1_cluster_data_filtered, seu2_clusters = seu2_cluster_data_filtered)
+
+umap_jaccard_plot <- make_umap_jaccard_plot(jaccards_df, save = file_paths$umap_jaccard_knn_density)
+
+umap_jaccard_plot
+```
+
+DE
+```{r}
+seu1_filtered_markers <- markers_seu1 %>% filter(p_val_adj < 0.05)
+seu2_filtered_markers <- markers_seu2 %>% filter(p_val_adj < 0.05)
+
+# vectorized_seu_unfiltered_markers <- unique(markers$gene)
+vectorized_seu1_filtered_markers <- unique(seu1_filtered_markers$gene)
+vectorized_seu2_filtered_markers <- unique(seu2_filtered_markers$gene)
+
+
+markers_euler_genes_only <- make_euler_seurat(vectorized_seu1_filtered_markers, vectorized_seu2_filtered_markers, comparison = "Marker Gene", group_names = seurat_group_names, save_plot = FALSE, save_stats = FALSE)
+markers_euler_genes_only
+
+upset_marker_gene_only <- make_upset_seurat(vectorized_seu1_filtered_markers, vectorized_seu2_filtered_markers, comparison = "Marker Gene", group_names = seurat_group_names, save = file_paths$upset_markers_genes_only)
+
+# From this point on, make sure to use markers dataframes with aligned cluster info
+if (!(identical(seu1_clusters, seu2_clusters))) {
+    stop("The groups have unequal cell sets, so not running further DE analysis, which requires clusters to be in agreement.")
+}
+
+seu1_markers_df <- markers_seu1 %>% select(gene = gene, cluster = cluster)
+seu2_markers_df <- markers_seu2 %>% select(gene = gene, cluster = cluster)
+
+vectorized_seu1_markers <- paste(seu1_markers_df$gene, seu1_markers_df$cluster, sep = "-")
+vectorized_seu2_markers <- paste(seu2_markers_df$gene, seu2_markers_df$cluster, sep = "-")
+
+markers_euler <- make_euler_seurat(vectorized_seu1_markers, vectorized_seu2_markers, comparison = "Marker", group_names = seurat_group_names, save_plot = FALSE, save_stats = FALSE)
+markers_euler
+
+upset_markers_all <- make_upset_seurat(vectorized_seu1_markers, vectorized_seu2_markers, comparison = "Marker", group_names = seurat_group_names, save = file_paths$upset_markers)
+
+markers2 <- markers_seu1 |>
+    inner_join(markers_seu2, by = c("cluster", "gene"), suffix = c(glue(".{seu1_name}"), glue(".{seu2_name}")))
+
+markers2 <- markers2 |>
+    mutate(cluster = factor(cluster, levels = as.character(seq_len(length(unique(cluster))) - 1)))
+
+markers2 <- markers2 |>
+    group_by(cluster) |>
+    mutate(rank_r = seq_along(gene))
+
+
+markers2 <- calculate_de_stats(markers2, group1_name = seu1_name, group2_name = seu2_name, save = FALSE)
+
+source(glue("{project_base_path}/scripts/plotting_and_stats.R"))
+markers2[[glue("p_val_adj.{seu1_name}")]][markers2[[glue("p_val_adj.{seu1_name}")]] == 0] <- .Machine$double.xmin
+markers2[[glue("p_val_adj.{seu2_name}")]][markers2[[glue("p_val_adj.{seu2_name}")]] == 0] <- .Machine$double.xmin
+
+logFC_scatterplot <- plot_scatterplot_de_logfc(markers2, group1_name = seu1_name, group2_name = seu2_name, ccc = markers2$CCC[1], save = file_paths$logFC_scatterplot_file_path, outliers_excluded = FALSE)
+pvaladj_scatterplot <- plot_scatterplot_de_wilcoxon(markers2, group1_name = seu1_name, group2_name = seu2_name, save = file_paths$wilcoxon_scatterplot_file_path, outliers_excluded = FALSE)
+
+logFC_scatterplot_with_legend <- plot_scatterplot_de_logfc(markers2, group1_name = seu1_name, group2_name = seu2_name, ccc = markers2$CCC[1], save = file_paths$logFC_scatterplot_file_path_with_legend, outliers_excluded = FALSE, show_legend = TRUE)
+
+logFC_scatterplot
+logFC_scatterplot_with_legend
+
+pvaladj_scatterplot
+```
+
+```{r}
+saveRDS(markers2, file = output_data_file_paths$markers2)
+```

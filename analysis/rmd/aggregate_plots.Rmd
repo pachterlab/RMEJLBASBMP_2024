@@ -1,0 +1,945 @@
+---
+title: "aggregate_plots"
+output: html_document
+date: "2024-01-01"
+---
+
+Select yaml file
+```{r}
+yaml_file <- "Fig2_Supp_Fig12_cell"  # Fig2_Supp_Fig11_read, Fig2_Supp_Fig12_cell
+```
+
+Load contents of yaml file into global R environment
+```{r}
+yaml_dir <- glue::glue("{dirname(getwd())}/yaml")
+
+yaml_file_path <- glue::glue("{yaml_dir}/{yaml_file}.yaml")
+
+config <- yaml::read_yaml(yaml_file_path)
+
+for (name in names(config)) {
+    assign(name, config[[name]], envir = .GlobalEnv)
+}
+
+print(glue::glue("frac_list = [{toString(frac_list)}]. downsampled_seeds_list = [{toString(downsampled_seeds_list)}]. Please make sure you have run each combination of these downsampled *{type_downsampled}* fractions and seeds before running this notebook."))
+```
+
+```{r}
+if (downsampled_data_path == "") {
+    downsampled_data_path <- glue::glue("{project_base_path}/count_matrix_collection/{data_name}/downsampled_stats")
+}
+
+if (data_path_root == "") {
+    data_path_root <- glue::glue("{project_base_path}/count_matrix_collection/{data_name}")
+}
+```
+
+
+```{r}
+Sys.setenv(RETICULATE_PYTHON = paste("/home/rstudio/.conda/envs", conda_env, "bin/python3.9", sep = "/"))
+library(reticulate)
+use_condaenv(conda_env)
+library(tidyverse)
+library(glue)
+theme_set(theme_bw())
+
+source(glue("{project_base_path}/scripts/data_analysis_helper.R"))
+```
+
+```{r}
+if (downsampled_data_file_link != "" && (!dir.exists(downsampled_data_path) || length(list.files(downsampled_data_path)) == 0)) {
+    downsampled_data_path <- download_box(downsampled_data_file_link, data_name_from_download, data_path_root)
+}
+```
+
+```{python}
+import sys
+sys.path.append(f"{r.project_base_path}/scripts")
+from download_data import *
+
+if not r.doi == "" and (not os.path.exists(r.downsampled_data_path) or not os.listdir(r.downsampled_data_path)):
+    download_and_extract(r.doi, r.data_name_from_download, r.data_path_root)
+```
+
+```{r}
+get_stats_filepath <- function(set, frac_str, package, type_downsampled, seed) {
+    if (package == "seu") {
+        package_full_name <- "seurat"
+        package_version <- seurat_version
+    } else if (package == "scan") {
+        package_full_name <- "scanpy"
+        package_version <- scanpy_version
+    }
+
+    if (type_downsampled == "read") {
+        downsample_string <- glue("cell_fraction_1_0/read_fraction_{package}1_1_0_vs_{package}2_{frac_str}_seed{seed}")
+    } else if (type_downsampled == "cell") {
+        downsample_string <- glue("cell_fraction_{package}1_1_0_vs_{package}2_{frac_str}_seed{seed}/read_fraction_1_0")
+    }
+
+    if (set$file_name == "de_stats.txt" && set$statistic_name != "Marker Genes Jaccard") {
+        data_input_for_filepath <- glue("{package}1")
+    } else {
+        data_input_for_filepath <- "default"
+    }
+
+    return(glue("{downsampled_data_path}/{package_full_name}v{package_version}/input_{data_input_for_filepath}/{matrix_generation}/{downsample_string}/stats/{set$file_name}"))
+}
+
+find_intersection <- function(df, y_value) {
+    interpolated <- approx(df$frac, df$value, xout = seq(min(df$frac), max(df$frac), length.out = 1000))
+
+    intersect_indices <- which(abs(interpolated$y - y_value) < 0.01)
+
+    if (length(intersect_indices) == 0) {
+        return(min(frac_list))
+    } else if ((set$ideal_value == 1 && interpolated$y[1] > interpolated$y[which.min(abs(interpolated$y - y_value))]) || (set$ideal_value == 0 && interpolated$y[1] < interpolated$y[which.min(abs(interpolated$y - y_value))])) {
+        return(min(frac_list))
+    }
+    else{
+        x_intersect <- interpolated$x[which.min(abs(interpolated$y - y_value))]
+        return(x_intersect)
+    }
+}
+```
+
+List of all metrics to extract
+```{r}
+variable_sets <- list(
+    list(
+        statistic_name = "Cells jaccard",
+        file_name = "euler_stats_afterQC.txt",
+        extraction_phrase = "Cells Jaccard: ",
+        baseline_value_seurat_vs_scanpy_default = 1,
+        baseline_value_seurat_vs_scanpy_same_input = NA,
+        ideal_value = 1,
+        seurat_noise_value = 0,
+        scanpy_noise_value = 0,
+        output_plot_name = "cells.tiff"
+    ),
+    list(
+        statistic_name = "Genes jaccard",
+        file_name = "euler_stats_afterQC.txt",
+        extraction_phrase = "Genes Jaccard: ",
+        baseline_value_seurat_vs_scanpy_default = 1,
+        baseline_value_seurat_vs_scanpy_same_input = NA,
+        ideal_value = 1,
+        seurat_noise_value = 0,
+        scanpy_noise_value = 0,
+        output_plot_name = "genes.tiff"
+    ),
+    list(
+        statistic_name = "HVGs jaccard",
+        file_name = "euler_stats_afterQC.txt",
+        extraction_phrase = "HVGs Jaccard: ",
+        baseline_value_seurat_vs_scanpy_default = 0.22249151720795,
+        baseline_value_seurat_vs_scanpy_same_input = NA,
+        ideal_value = 1,
+        seurat_noise_value = 0,
+        scanpy_noise_value = 0,
+        output_plot_name = "hvgs.tiff"
+    ),
+    list(
+        statistic_name = "Mean ΔPC1-3 loadings",
+        file_name = "pca_knn_clustering_umap_stats.txt",
+        extraction_phrase = "Mean loading difference of PC1-3: ",
+        baseline_value_seurat_vs_scanpy_default = 0.417599195296815,
+        baseline_value_seurat_vs_scanpy_same_input = NA,
+        ideal_value = 0,
+        seurat_noise_value = 0,
+        scanpy_noise_value = 0,
+        output_plot_name = "pca.tiff"
+    ),
+    list(
+        statistic_name = "Median log SNN degree ratio",
+        file_name = "pca_knn_clustering_umap_stats.txt",
+        extraction_phrase = "Median magnitude of log degree ratio of SNN: ",
+        baseline_value_seurat_vs_scanpy_default = 2.05889368905357,
+        baseline_value_seurat_vs_scanpy_same_input = NA,  # 2.04306872189189,
+        ideal_value = 0,
+        seurat_noise_value = 0.0506260730699681,
+        scanpy_noise_value = 0,
+        output_plot_name = "knn.tiff"
+    ),
+    list(
+        statistic_name = "Clustering ARI",
+        file_name = "pca_knn_clustering_umap_stats.txt",
+        extraction_phrase = "Adjusted Rand index between clusters: ",
+        baseline_value_seurat_vs_scanpy_default = 0.706349552155871,
+        baseline_value_seurat_vs_scanpy_same_input = NA,  # 0.87916666950325,
+        ideal_value = 1,
+        seurat_noise_value = 0.960830668923305,
+        scanpy_noise_value = 0.895756006298351,  
+        output_plot_name = "clustering.tiff"
+    ),
+    list(
+        statistic_name = "Median jaccard of UMAP KNN",
+        file_name = "pca_knn_clustering_umap_stats.txt",
+        extraction_phrase = "Median jaccard of UMAP KNN: ",
+        baseline_value_seurat_vs_scanpy_default = 0.0638297872340425,
+        baseline_value_seurat_vs_scanpy_same_input = NA,  # 0.204819277108434,
+        ideal_value = 1,
+        seurat_noise_value = 0.408450704225352,
+        scanpy_noise_value = 0.470588235294118,
+        output_plot_name = "umap.tiff"
+    ),
+    list(
+        statistic_name = "Marker Genes Jaccard",
+        file_name = "de_stats.txt",
+        extraction_phrase = "Marker Genes Jaccard: ",
+        baseline_value_seurat_vs_scanpy_default = 0.615919763464549,
+        baseline_value_seurat_vs_scanpy_same_input = NA,  # 0.475609756097561,
+        ideal_value = 1,
+        seurat_noise_value = 0,
+        scanpy_noise_value = 0,
+        output_plot_name = "marker_genes.tiff"
+    ),
+    list(
+        statistic_name = "Markers Jaccard",
+        file_name = "de_stats.txt",
+        extraction_phrase = "Markers Jaccard: ",
+        baseline_value_seurat_vs_scanpy_default = NA,
+        baseline_value_seurat_vs_scanpy_same_input = 0.222991819976808,
+        ideal_value = 1,
+        seurat_noise_value = 0,
+        scanpy_noise_value = 0,
+        output_plot_name = "markers.tiff"
+    ),
+    list(
+        statistic_name = "logFC CCC",
+        file_name = "de_stats.txt",
+        extraction_phrase = "logFC CCC: ",
+        baseline_value_seurat_vs_scanpy_default = NA,
+        baseline_value_seurat_vs_scanpy_same_input = 0.980466856603784,
+        ideal_value = 1,
+        seurat_noise_value = 0,
+        scanpy_noise_value = 0,
+        output_plot_name = "logfc.tiff"
+    ),
+    list(
+        statistic_name = "Adj p-value flip rate",
+        file_name = "de_stats.txt",
+        extraction_phrase = "Adjusted p value, fraction that flipped across 0.05 threshold: ",
+        baseline_value_seurat_vs_scanpy_default = NA,
+        baseline_value_seurat_vs_scanpy_same_input = 0.2,
+        ideal_value = 0,
+        seurat_noise_value = 0,
+        scanpy_noise_value = 0,
+        output_plot_name = "pvaladj.tiff"
+    )
+) 
+```
+
+```{r}
+if (type_downsampled == "cell") {
+    variable_sets <- variable_sets[1:8]
+}
+```
+
+All plots with light seed lines
+```{r}
+statistic_names_total <- unlist(lapply(variable_sets, function(x) x$statistic_name))
+
+# variable_sets <- list(
+#     list(
+#         statistic_name = "Mean ΔPC1-3 loadings",
+#         file_name = "pca_knn_clustering_umap_stats.txt",
+#         extraction_phrase = "Mean loading difference of PC1-3: ",
+#         baseline_value_seurat_vs_scanpy_default = 0.411333932197237,
+#         baseline_value_seurat_vs_scanpy_same_input = 0.704549354155186,
+#         ideal_value = 0,
+#         seurat_noise_value = 0,
+#         scanpy_noise_value = 0,
+#         output_plot_name = "pca.tiff"
+#     )
+# )
+
+if (type_downsampled == "cell") {
+    output_path_base <- glue("{project_base_path}/output/{data_name}/aggregate_plots/across_downsampled_cells")
+} else if (type_downsampled == "read") {
+    output_path_base <- glue("{project_base_path}/output/{data_name}/aggregate_plots/across_downsampled_reads")
+}
+
+if (margin_correct == 0) {
+    output_stat_filepath <- glue("{output_path_base}/intersection_stats.txt")
+} else {
+    output_stat_filepath <- glue("{output_path_base}/intersection_stats_margin{margin_correct}.txt")
+}
+
+if (file.exists(output_stat_filepath)) {
+    sink(file = output_stat_filepath, append = FALSE)
+    sink()
+}
+
+
+for (set in variable_sets) {
+    results_df <- data.frame(frac = numeric(), value_group1 = numeric(), value_group2 = numeric(), seed = numeric())
+
+    output_plot_filepath <- glue("{output_path_base}/show_seeds/{set$output_plot_name}")
+
+    for (package in c("seu", "scan")) {
+        for (frac in frac_list) {
+            for (seed in downsampled_seeds_list) {
+                frac_str <- gsub("\\.", "_", as.character(frac)) # fraction of reads after downsampling, as string
+    
+                stats_path <- get_stats_filepath(set, frac_str = frac_str, package = package, type_downsampled = type_downsampled, seed = seed)
+    
+                # Read the file lines
+                lines <- readLines(stats_path)
+    
+                value_line <- grep(set$extraction_phrase, lines, value = TRUE)
+    
+                # Extract the numerical variance using string manipulation
+                value <- as.numeric(str_extract(value_line, "(?<=: )\\d+(\\.\\d+)?(e[-+]?\\d+)?"))
+    
+                if (package == "seu") {
+                    new_row <- data.frame(frac = frac, value_group1 = value, value_group2 = NA, seed = seed)
+                } else if (package == "scan") {
+                    new_row <- data.frame(frac = frac, value_group1 = NA, value_group2 = value, seed = seed)
+                }
+                # Add the results to the data frame
+                results_df <- rbind(results_df, new_row)
+            }
+        }
+    }
+
+    results_df2 <- results_df %>%
+        distinct() %>%
+        group_by(frac) %>%
+        summarize(
+            value_group1_mean = mean(value_group1, na.rm = TRUE),
+            value_group2_mean = mean(value_group2, na.rm = TRUE),
+            sd_group1 = sd(value_group1, na.rm = TRUE),
+            sd_group2 = sd(value_group2, na.rm = TRUE)
+        ) %>%
+        dplyr::rename(
+            value_group1 = value_group1_mean,
+            value_group2 = value_group2_mean
+        )
+    
+    long_df <- results_df2 %>%
+        pivot_longer(
+            cols = c(value_group1, value_group2),
+            names_to = "variable",
+            values_to = "value"
+        ) %>%
+        mutate(
+            sd = case_when(
+              variable == "value_group1" ~ sd_group1,
+              variable == "value_group2" ~ sd_group2
+            )
+        ) %>%
+        select(-sd_group1, -sd_group2) 
+    
+    baseline_rows <- tibble(
+        frac = c(1.0, 1.0),
+        variable = c("value_group1", "value_group2"),
+        value = c(ifelse(set$seurat_noise_value == 0, set$ideal_value, set$seurat_noise_value), ifelse(set$scanpy_noise_value == 0, set$ideal_value, set$scanpy_noise_value))
+    )
+    
+    long_df <- bind_rows(long_df, baseline_rows) %>% mutate(sd = ifelse(is.na(sd), 0, sd))
+
+    y_axis_max <- max(1, set$baseline_value_seurat_vs_scanpy_default, set$baseline_value_seurat_vs_scanpy_same_input, max(long_df$value, na.rm = TRUE), na.rm = TRUE)
+    
+    if (set$statistic_name == "logFC CCC") {
+        y_axis_min <- -1
+    } else {
+        y_axis_min <- 0
+    }
+    
+    results_df_long = NULL
+    long_df_adjusted = NULL
+    
+    results_df_long <- results_df %>% 
+      pivot_longer(cols = starts_with("value"), names_to = "group", values_to = "value") %>%
+      mutate(group = factor(group, levels = c("value_group1", "value_group2")))
+    
+    long_df_adjusted <- long_df %>%
+      mutate(variable = case_when(
+        variable == "value_group1" ~ "long_df_value_group1",
+        variable == "value_group2" ~ "long_df_value_group2",
+        TRUE ~ variable # Default case, if needed
+      ))
+    
+    results_df_long <- results_df_long %>% filter(!is.na(value))
+    
+    unique_seeds <- unique(results_df_long$seed[!is.na(results_df_long$seed)])
+    
+    expanded_baseline_rows <- tidyr::crossing(seed = unique_seeds, baseline_rows)
+    
+    expanded_baseline_rows <- expanded_baseline_rows %>% rename(group = variable)
+    
+    results_df_long <- bind_rows(results_df_long, expanded_baseline_rows)
+     
+    p <- ggplot(results_df_long, aes(x = frac, y = value, group = interaction(seed, group), color = group)) + 
+        geom_line(size = 0.8) + 
+        geom_line(data = long_df_adjusted, aes(x = frac, y = value, color = variable, group = variable), size = 1.5) +
+        scale_color_manual(values = c(
+          "value_group1" = "#ffc79a",  # Original group1 color
+          "value_group2" = "#bee2f7",  # Original group2 color
+          "long_df_value_group1" = "#D55E00",  # New color for long_df group1
+          "long_df_value_group2" = "#56B4E9"  # New color for long_df group2
+        )) +
+        theme_minimal() +
+        theme(
+            text = element_text(family = "Arial"),
+            legend.position = "none",
+            axis.text.x = element_text(angle = 45, hjust = 1, size = rel(0.55)),
+            axis.text.y = element_text(size = rel(1)), # Increase axis tick labels size
+            axis.title = element_text(size = rel(1.45))
+        ) +
+        scale_y_continuous(
+            limits = c(y_axis_min, y_axis_max), # Setting y-axis limits from 0 to 1
+            breaks = seq(y_axis_min, y_axis_max, by = 0.2), # Major ticks every 0.2
+            minor_breaks = seq((y_axis_min + 0.1), (y_axis_max - 0.1), by = 0.2)
+        ) + # Minor ticks at 0.1, 0.3, 0.5, 0.7, 0.9
+        scale_x_continuous(
+            breaks = c(frac_list[2:length(frac_list)], 1.0) # Set the breaks at specified points
+        ) + 
+        coord_cartesian(xlim = c(0, 1), ylim = c(0, y_axis_max)) +
+        xlab(glue("Fraction Downsampled ({type_downsampled}s)")) +
+        ylab(set$statistic_name)
+
+    if (set$statistic_name == "Median log SNN degree ratio" && type_downsampled == "cell") {
+        p <- p +
+            scale_y_continuous(
+                limits = c(y_axis_min, y_axis_max), # Setting y-axis limits from 0 to 1
+                breaks = seq(y_axis_min, y_axis_max, by = 1), # Major ticks every 0.2
+                minor_breaks = seq((y_axis_min + 0.5), (y_axis_max - 0.5), by = 0.5)
+            )
+    }
+
+    if (!is.na(set$baseline_value_seurat_vs_scanpy_default)) {
+        p <- p +
+            geom_hline(aes(yintercept = set$baseline_value_seurat_vs_scanpy_default), color = "black", linetype = "dashed", linewidth = 0.5) # +
+        # annotate("text", x = 1, y = (set$baseline_value_seurat_vs_scanpy_default + 0.1), label = glue("Seurat vs Scanpy, full-size datasets"), hjust = 1, color = "black") +
+    }
+
+    if (!is.na(set$baseline_value_seurat_vs_scanpy_same_input)) {
+        p <- p +
+            geom_hline(aes(yintercept = set$baseline_value_seurat_vs_scanpy_same_input), color = "black", linetype = "dashed", linewidth = 0.5) # +
+        # annotate("text", x = 1, y = (set$baseline_value_seurat_vs_scanpy_same_input + 0.1), label = glue("Seurat vs Scanpy, full-size datasets"), hjust = 1, color = "black") +
+    }
+
+    print(p)
+
+
+    dir.create(dirname(output_plot_filepath), recursive = TRUE, showWarnings = FALSE)
+
+    ggsave(output_plot_filepath, plot = p, dpi = 500, bg = "white", width = 2100, height = 2100, units = "px")
+
+    group1_df <- filter(long_df, variable == "value_group1")
+    group2_df <- filter(long_df, variable == "value_group2")
+
+    if (set$ideal_value == 0) {
+        margin_adjustment <- 1 + margin_correct
+    } else {
+        margin_adjustment <- 1 - margin_correct
+    }
+
+    x_intersect_defaults_group1 <- find_intersection(group1_df, margin_adjustment * set$baseline_value_seurat_vs_scanpy_default)
+    x_intersect_defaults_group2 <- find_intersection(group2_df, margin_adjustment * set$baseline_value_seurat_vs_scanpy_default)
+
+    x_intersect_same_input_group1 <- find_intersection(group1_df, margin_adjustment * set$baseline_value_seurat_vs_scanpy_same_input)
+    x_intersect_same_input_group2 <- find_intersection(group2_df, margin_adjustment * set$baseline_value_seurat_vs_scanpy_same_input)
+
+
+    sink(file = output_stat_filepath, append = TRUE)
+    if (!(set$statistic_name %in% c("Markers Jaccard", "logFC CCC", "Adj p-value flip rate"))) {
+        print(glue("{set$statistic_name} - Group 1 (Seurat) fraction intersecting with seu vs scan defaults: {x_intersect_defaults_group1}"))
+    }
+
+    print(glue("{set$statistic_name} - Group 1 (Seurat) fraction intersecting with seu vs scan same input: {x_intersect_same_input_group1}"))
+
+    if (!(set$statistic_name %in% c("Markers Jaccard", "logFC CCC", "Adj p-value flip rate"))) {
+        print(glue("{set$statistic_name} - Group 2 (Scanpy) fraction intersecting with seu vs scan defaults: {x_intersect_defaults_group2}"))
+    }
+
+    print(glue("{set$statistic_name} - Group 2 (Scanpy) fraction intersecting with seu vs scan same input: {x_intersect_same_input_group2}"))
+    sink()
+}
+```
+
+Downsample line plots with ribbons
+```{r}
+statistic_names_total <- unlist(lapply(variable_sets, function(x) x$statistic_name))
+
+# variable_sets <- list(
+#     list(
+#         statistic_name = "Mean ΔPC1-3 loadings",
+#         file_name = "pca_knn_clustering_umap_stats.txt",
+#         extraction_phrase = "Mean loading difference of PC1-3: ",
+#         baseline_value_seurat_vs_scanpy_default = 0.411333932197237,
+#         baseline_value_seurat_vs_scanpy_same_input = 0.704549354155186,
+#         ideal_value = 0,
+#         seurat_noise_value = 0,
+#         scanpy_noise_value = 0,
+#         output_plot_name = "pca.tiff"
+#     )
+# )
+
+if (type_downsampled == "cell") {
+    output_path_base <- glue("{project_base_path}/output/{data_name}/aggregate_plots/across_downsampled_cells")
+} else if (type_downsampled == "read") {
+    output_path_base <- glue("{project_base_path}/output/{data_name}/aggregate_plots/across_downsampled_reads")
+}
+
+if (margin_correct == 0) {
+    output_stat_filepath <- glue("{output_path_base}/intersection_stats.txt")
+} else {
+    output_stat_filepath <- glue("{output_path_base}/intersection_stats_margin{margin_correct}.txt")
+}
+
+if (file.exists(output_stat_filepath)) {
+    sink(file = output_stat_filepath, append = FALSE)
+    sink()
+}
+
+
+for (set in variable_sets) {
+    results_df <- data.frame(frac = numeric(), value_group1 = numeric(), value_group2 = numeric(), seed = numeric())
+
+    output_plot_filepath <- glue("{output_path_base}/{set$output_plot_name}")
+
+    for (package in c("seu", "scan")) {
+        for (frac in frac_list) {
+            for (seed in downsampled_seeds_list) {
+                frac_str <- gsub("\\.", "_", as.character(frac)) # fraction of reads after downsampling, as string
+    
+                stats_path <- get_stats_filepath(set, frac_str = frac_str, package = package, type_downsampled = type_downsampled, seed = seed)
+    
+                # Read the file lines
+                lines <- readLines(stats_path)
+    
+                value_line <- grep(set$extraction_phrase, lines, value = TRUE)
+    
+                # Extract the numerical variance using string manipulation
+                value <- as.numeric(str_extract(value_line, "(?<=: )\\d+(\\.\\d+)?(e[-+]?\\d+)?"))
+    
+                if (package == "seu") {
+                    new_row <- data.frame(frac = frac, value_group1 = value, value_group2 = NA, seed = seed)
+                } else if (package == "scan") {
+                    new_row <- data.frame(frac = frac, value_group1 = NA, value_group2 = value, seed = seed)
+                }
+                # Add the results to the data frame
+                results_df <- rbind(results_df, new_row)
+            }
+        }
+    }
+
+    results_df2 <- results_df %>%
+        distinct() %>%
+        group_by(frac) %>%
+        summarize(
+            value_group1_mean = mean(value_group1, na.rm = TRUE),
+            value_group2_mean = mean(value_group2, na.rm = TRUE),
+            sd_group1 = sd(value_group1, na.rm = TRUE),
+            sd_group2 = sd(value_group2, na.rm = TRUE)
+        ) %>%
+        dplyr::rename(
+            value_group1 = value_group1_mean,
+            value_group2 = value_group2_mean
+        )
+    
+    long_df <- results_df2 %>%
+        pivot_longer(
+            cols = c(value_group1, value_group2),
+            names_to = "variable",
+            values_to = "value"
+        ) %>%
+        mutate(
+            sd = case_when(
+              variable == "value_group1" ~ sd_group1,
+              variable == "value_group2" ~ sd_group2
+            )
+        ) %>%
+        select(-sd_group1, -sd_group2) 
+    
+    baseline_rows <- tibble(
+        frac = c(1.0, 1.0),
+        variable = c("value_group1", "value_group2"),
+        value = c(ifelse(set$seurat_noise_value == 0, set$ideal_value, set$seurat_noise_value), ifelse(set$scanpy_noise_value == 0, set$ideal_value, set$scanpy_noise_value))
+    )
+
+    long_df <- bind_rows(long_df, baseline_rows) %>% mutate(sd = ifelse(is.na(sd), 0, sd))
+
+    y_axis_max <- max(1, set$baseline_value_seurat_vs_scanpy_default, set$baseline_value_seurat_vs_scanpy_same_input, max(long_df$value, na.rm = TRUE), na.rm = TRUE)
+    
+    if (set$statistic_name == "logFC CCC") {
+        y_axis_min <- -1
+    } else {
+        y_axis_min <- 0
+    }
+    
+    long_df <- long_df %>%
+        mutate(ymin = pmax(value - sd, y_axis_min),
+               ymax = pmin(value + sd, y_axis_max))
+
+    p <- ggplot(long_df, aes(x = frac, y = value, group = variable, color = variable)) +
+        geom_line(linewidth = 1.3) +
+        geom_ribbon(aes(ymin = ymin, ymax = ymax, fill = variable), alpha = 0.3, color = NA) +
+        scale_color_manual(values = c("value_group1" = "#D55E00", "value_group2" = "#56B4E9"), labels = c("Seurat", "Scanpy")) +
+        scale_fill_manual(values = c("value_group1" = "#D55E00", "value_group2" = "#56B4E9"), labels = c("Seurat", "Scanpy"), guide = FALSE) +
+        labs(color = "variable") +
+        theme_minimal() +
+        theme(
+            text = element_text(family = "Arial"),
+            legend.position = "none",
+            axis.text.x = element_text(angle = 45, hjust = 1, size = rel(0.55)),
+            axis.text.y = element_text(size = rel(1)), # Increase axis tick labels size
+            axis.title = element_text(size = rel(1.45))
+        ) +
+        scale_y_continuous(
+            limits = c(y_axis_min, y_axis_max), # Setting y-axis limits from 0 to 1
+            breaks = seq(y_axis_min, y_axis_max, by = 0.2), # Major ticks every 0.2
+            minor_breaks = seq((y_axis_min + 0.1), (y_axis_max - 0.1), by = 0.2)
+        ) + # Minor ticks at 0.1, 0.3, 0.5, 0.7, 0.9
+        scale_x_continuous(
+            breaks = c(frac_list[2:length(frac_list)], 1.0) # Set the breaks at specified points
+        ) + 
+        coord_cartesian(xlim = c(0, 1), ylim = c(0, y_axis_max)) +
+        xlab(glue("Fraction Downsampled ({type_downsampled}s)")) +
+        ylab(set$statistic_name)
+    
+    if (set$statistic_name == "Median log SNN degree ratio" && type_downsampled == "cell") {
+        p <- p +
+            scale_y_continuous(
+                limits = c(y_axis_min, y_axis_max), # Setting y-axis limits from 0 to 1
+                breaks = seq(y_axis_min, y_axis_max, by = 1), # Major ticks every 0.2
+                minor_breaks = seq((y_axis_min + 0.5), (y_axis_max - 0.5), by = 0.5)
+            )
+    }
+
+    if (!is.na(set$baseline_value_seurat_vs_scanpy_default)) {
+        p <- p +
+            geom_hline(aes(yintercept = set$baseline_value_seurat_vs_scanpy_default), color = "black", linetype = "dashed", linewidth = 0.5) # +
+        # annotate("text", x = 1, y = (set$baseline_value_seurat_vs_scanpy_default + 0.1), label = glue("Seurat vs Scanpy, full-size datasets"), hjust = 1, color = "black") +
+    }
+
+    if (!is.na(set$baseline_value_seurat_vs_scanpy_same_input)) {
+        p <- p +
+            geom_hline(aes(yintercept = set$baseline_value_seurat_vs_scanpy_same_input), color = "black", linetype = "dashed", linewidth = 0.5) # +
+        # annotate("text", x = 1, y = (set$baseline_value_seurat_vs_scanpy_same_input + 0.1), label = glue("Seurat vs Scanpy, full-size datasets"), hjust = 1, color = "black") +
+    }
+
+    # if (set$seurat_noise_value != 0) {
+    #     if ((set$scanpy_noise_value / set$seurat_noise_value) > 0.9 && (set$scanpy_noise_value / set$seurat_noise_value) < 1.1) {
+    #         noise_color <- "gray30"
+    #         label <- "Inherent noise"
+    #     } else {
+    #         noise_color <- "#D55E00"
+    #         label <- "Inherent noise (Seurat)"
+    #     }
+    #     p <- p +
+    #         # annotate("text", x = 1, y = (set$noise_value + 0.1), label = label, hjust = 1, color = noise_color) +
+    #         geom_hline(aes(yintercept = set$seurat_noise_value), color = noise_color, linetype = "solid", size = 0.5)
+    # }
+    # 
+    # if (set$scanpy_noise_value != 0) {
+    #     if (!(set$seurat_noise_value / set$scanpy_noise_value) > 0.9 && (set$seurat_noise_value / set$scanpy_noise_value) < 1.1) {
+    #         p <- p +
+    #             # annotate("text", x = 1, y = (set$noise_value + 0.1), label = "Inherent noise (Scanpy)", hjust = 1, color = "#56B4E9") +
+    #             geom_hline(aes(yintercept = set$scanpy_noise_value), color = "#56B4E9", linetype = "solid", size = 0.5)
+    #     }
+    # }
+
+    print(p)
+
+
+    dir.create(dirname(output_plot_filepath), recursive = TRUE, showWarnings = FALSE)
+
+    ggsave(output_plot_filepath, plot = p, dpi = 500, bg = "white", width = 2100, height = 2100, units = "px")
+
+    group1_df <- filter(long_df, variable == "value_group1")
+    group2_df <- filter(long_df, variable == "value_group2")
+
+    if (set$ideal_value == 0) {
+        margin_adjustment <- 1 + margin_correct
+    } else {
+        margin_adjustment <- 1 - margin_correct
+    }
+
+    x_intersect_defaults_group1 <- find_intersection(group1_df, margin_adjustment * set$baseline_value_seurat_vs_scanpy_default)
+    x_intersect_defaults_group2 <- find_intersection(group2_df, margin_adjustment * set$baseline_value_seurat_vs_scanpy_default)
+
+    x_intersect_same_input_group1 <- find_intersection(group1_df, margin_adjustment * set$baseline_value_seurat_vs_scanpy_same_input)
+    x_intersect_same_input_group2 <- find_intersection(group2_df, margin_adjustment * set$baseline_value_seurat_vs_scanpy_same_input)
+
+
+    sink(file = output_stat_filepath, append = TRUE)
+    if (!(set$statistic_name %in% c("Markers Jaccard", "logFC CCC", "Adj p-value flip rate"))) {
+        print(glue("{set$statistic_name} - Group 1 (Seurat) fraction intersecting with seu vs scan defaults: {x_intersect_defaults_group1}"))
+    }
+
+    print(glue("{set$statistic_name} - Group 1 (Seurat) fraction intersecting with seu vs scan same input: {x_intersect_same_input_group1}"))
+
+    if (!(set$statistic_name %in% c("Markers Jaccard", "logFC CCC", "Adj p-value flip rate"))) {
+        print(glue("{set$statistic_name} - Group 2 (Scanpy) fraction intersecting with seu vs scan defaults: {x_intersect_defaults_group2}"))
+    }
+
+    print(glue("{set$statistic_name} - Group 2 (Scanpy) fraction intersecting with seu vs scan same input: {x_intersect_same_input_group2}"))
+    sink()
+}
+```
+```{r}
+if (type_downsampled == "cell") {
+    variable_sets <- variable_sets[-1]
+    statistic_names_total <- unlist(lapply(variable_sets, function(x) x$statistic_name))
+}
+```
+
+
+```{r}
+if (length(downsampled_seeds_list) > 1) {
+    seed_intersections <- list(
+        Seurat = data.frame(matrix(ncol = length(downsampled_seeds_list), nrow = length(statistic_names_total))),
+        Scanpy = data.frame(matrix(ncol = length(downsampled_seeds_list), nrow = length(statistic_names_total)))
+    )
+    
+    # Set row and column names for each dataframe in the list
+    names(seed_intersections$Seurat) <- downsampled_seeds_list
+    rownames(seed_intersections$Seurat) <- statistic_names_total
+    
+    names(seed_intersections$Scanpy) <- downsampled_seeds_list
+    rownames(seed_intersections$Scanpy) <- statistic_names_total
+    
+    
+    
+    for (set in variable_sets) {
+        for (seed in downsampled_seeds_list) {
+            results_df <- data.frame(frac = numeric(), value_group1 = numeric(), value_group2 = numeric(), seed = numeric())
+    
+            for (package in c("seu", "scan")) {
+                for (frac in frac_list) {
+                    
+                    frac_str <- gsub("\\.", "_", as.character(frac)) # fraction of reads after downsampling, as string
+        
+                    stats_path <- get_stats_filepath(set, frac_str = frac_str, package = package, type_downsampled = type_downsampled, seed = seed)
+        
+                    # Read the file lines
+                    lines <- readLines(stats_path)
+        
+                    value_line <- grep(set$extraction_phrase, lines, value = TRUE)
+        
+                    # Extract the numerical variance using string manipulation
+                    value <- as.numeric(str_extract(value_line, "(?<=: )\\d+(\\.\\d+)?(e[-+]?\\d+)?"))
+        
+                    if (package == "seu") {
+                        new_row <- data.frame(frac = frac, value_group1 = value, value_group2 = NA, seed = seed)
+                    } else if (package == "scan") {
+                        new_row <- data.frame(frac = frac, value_group1 = NA, value_group2 = value, seed = seed)
+                    }
+                    # Add the results to the data frame
+                    results_df <- rbind(results_df, new_row)
+                }
+            }
+        
+            results_df2 <- results_df %>%
+                distinct() %>%
+                group_by(frac) %>%
+                summarize(
+                    value_group1 = max(value_group1, na.rm = TRUE),
+                    value_group2 = max(value_group2, na.rm = TRUE)
+                )
+            
+            long_df <- results_df2 %>%
+                pivot_longer(
+                    cols = c(value_group1, value_group2),
+                    names_to = "variable",
+                    values_to = "value"
+                )
+        
+            baseline_rows <- tibble(
+                frac = c(1.0, 1.0),
+                variable = c("value_group1", "value_group2"),
+                value = c(ifelse(set$seurat_noise_value == 0, set$ideal_value, set$seurat_noise_value), ifelse(set$scanpy_noise_value == 0, set$ideal_value, set$scanpy_noise_value))
+            )
+        
+            long_df <- bind_rows(long_df, baseline_rows)
+        
+            group1_df <- filter(long_df, variable == "value_group1")
+            group2_df <- filter(long_df, variable == "value_group2")
+        
+            if (set$ideal_value == 0) {
+                margin_adjustment <- 1 + margin_correct
+            } else {
+                margin_adjustment <- 1 - margin_correct
+            }
+        
+            x_intersect_defaults_group1 <- find_intersection(group1_df, margin_adjustment * set$baseline_value_seurat_vs_scanpy_default)
+            x_intersect_defaults_group2 <- find_intersection(group2_df, margin_adjustment * set$baseline_value_seurat_vs_scanpy_default)
+        
+            x_intersect_same_input_group1 <- find_intersection(group1_df, margin_adjustment * set$baseline_value_seurat_vs_scanpy_same_input)
+            x_intersect_same_input_group2 <- find_intersection(group2_df, margin_adjustment * set$baseline_value_seurat_vs_scanpy_same_input)
+        
+            if (!(set$statistic_name %in% c("Markers Jaccard", "logFC CCC", "Adj p-value flip rate"))) {
+                seed_intersections[["Seurat"]][set$statistic_name, as.character(seed)] <- x_intersect_defaults_group1
+                seed_intersections[["Scanpy"]][set$statistic_name, as.character(seed)] <- x_intersect_defaults_group2
+            } else {
+                seed_intersections[["Seurat"]][set$statistic_name, as.character(seed)] <- x_intersect_same_input_group1
+                seed_intersections[["Scanpy"]][set$statistic_name, as.character(seed)] <- x_intersect_same_input_group2
+            }
+        }
+    }
+    
+    rownames(seed_intersections$Seurat)[rownames(seed_intersections$Seurat) == "Median log SNN degree ratio"] <- "Median log(SNN degree ratio)"
+    rownames(seed_intersections$Scanpy)[rownames(seed_intersections$Scanpy) == "Median log SNN degree ratio"] <- "Median log(SNN degree ratio)"
+    
+    seed_intersections$Seurat$Category <- factor(rownames(seed_intersections$Seurat), levels = rownames(seed_intersections$Seurat))
+    seed_intersections$Scanpy$Category <- factor(rownames(seed_intersections$Scanpy), levels = rownames(seed_intersections$Scanpy))
+    
+    df_long_seurat <- pivot_longer(seed_intersections$Seurat, cols = -Category, names_to = "Sample", values_to = "Value")
+    df_long_scanpy <- pivot_longer(seed_intersections$Scanpy, cols = -Category, names_to = "Sample", values_to = "Value")
+}
+```
+
+
+Bar charts summarizing all line graphs
+```{r}
+bar_chart_df <- data.frame(
+    Category = character(),
+    Seurat = numeric(),
+    Scanpy = numeric()
+)
+
+# bar_chart_df <- data.frame(
+#     category = c("Cell Filtering", "Gene Filtering", "HVG selection", "PCA", "KNN", "Clustering", "UMAP", "DE (marker genes)", "DE (markers)", "DE (logFC)", "DE (p-val adjusted)"),
+#     Seurat = c(1, .4, .4, .4, .4, .4, .4, .4, .4, .4, .4),
+#     Scanpy = c(1, .4, .6, .3, .4, .4, .4, .4, .4, .4, .4))
+
+if (margin_correct == 0) {
+    aggregate_bar_chart_name <- "bar_plot_across_reads.tiff"
+} else {
+    aggregate_bar_chart_name <- glue("bar_plot_across_reads_{margin_correct}.tiff")
+}
+
+# if (type_downsampled == "cell") {
+#     statistic_names_total <- statistic_names_total[2:8]
+# }
+
+lines <- readLines(output_stat_filepath)
+
+for (statistic in statistic_names_total) {
+    if (statistic %in% c("Markers Jaccard", "logFC CCC", "Adj p-value flip rate")) {
+        extraction_phrase_ending <- "same input"
+    } else {
+        extraction_phrase_ending <- "defaults"
+    }
+
+    extraction_phrase_group1 <- glue("{statistic} - Group 1 \\(Seurat\\) fraction intersecting with seu vs scan {extraction_phrase_ending}: ")
+    value_line_group1 <- grep(extraction_phrase_group1, lines, value = TRUE)
+    value_group1 <- as.numeric(str_extract(value_line_group1, "(?<=: )\\d+(\\.\\d+)?"))
+
+    if (length(value_group1) == 0 || is.na(value_group1)) {
+        value_group1 <- 5e-3
+    }
+
+    extraction_phrase_group2 <- glue("{statistic} - Group 2 \\(Scanpy\\) fraction intersecting with seu vs scan {extraction_phrase_ending}: ")
+    value_line_group2 <- grep(extraction_phrase_group2, lines, value = TRUE)
+    value_group2 <- as.numeric(str_extract(value_line_group2, "(?<=: )\\d+(\\.\\d+)?"))
+
+    if (length(value_group2) == 0 || is.na(value_group2)) {
+        value_group2 <- 5e-3
+    }
+
+    new_row <- data.frame(Category = statistic, Seurat = value_group1, Scanpy = value_group2)
+
+    bar_chart_df <- rbind(bar_chart_df, new_row)
+}
+
+bar_chart_df$Category <- gsub("log SNN degree ratio", "log(SNN degree ratio)", bar_chart_df$Category)
+
+bar_chart_df$Category <- factor(bar_chart_df$Category, levels = bar_chart_df$Category)
+
+long_bar_chart <- bar_chart_df %>%
+    pivot_longer(
+        cols = c(Seurat, Scanpy),
+        names_to = "variable",
+        values_to = "value"
+    )
+
+long_bar_chart$value <- ifelse(long_bar_chart$value < min(frac_list), min(frac_list), long_bar_chart$value)
+
+long_bar_chart$variable <- factor(long_bar_chart$variable, levels = c("Seurat", "Scanpy"))
+
+
+
+aggregate_bar_chart <- ggplot(long_bar_chart, aes(x = Category, y = value, fill = variable)) +
+    geom_bar(stat = "identity", position = position_dodge()) +
+    # geom_text(aes(label = round(value, 2)),
+    #           position = position_dodge(width = 0.9),   # Adjust the position to align with the bars
+    #           vjust = -0.5,                             # Negative value for vertical adjustment to move text above bars
+    #           color = "black",                          # Text color
+    #           size = 3) +
+    scale_fill_manual(values = c("Seurat" = "#D55E00", "Scanpy" = "#56B4E9")) +
+    labs(x = "", y = glue("Fraction of {tools::toTitleCase(type_downsampled)}s Needed"), fill = "Package") +
+    coord_cartesian(ylim = c(0, 1)) +
+    theme_minimal() +
+    guides(fill = guide_legend(title = NULL)) +
+    theme(
+        text = element_text(family = "Arial"),
+        legend.position = "none",
+        legend.text = element_text(size = rel(1.45)),
+        axis.text.x = element_text(angle = 45, hjust = 1, size = rel(1.2)),
+        axis.title = element_text(size = rel(1.45))
+    ) # Rotate x-axis labels if needed
+
+if (length(downsampled_seeds_list) > 1) {
+    aggregate_bar_chart <- aggregate_bar_chart + 
+        geom_point(data = df_long_seurat, 
+                 aes(x = Category, y = Value, group = Category), 
+                 inherit.aes = FALSE,
+                 position = position_nudge(x = -0.222),  # Adjust width to align with bars
+                 color = "black",  # Choose color to distinguish points
+                 fill = "#D55E00",
+                 shape = 21,
+                 size = 1.5, 
+                 alpha = 0.5) +
+        geom_point(data = df_long_scanpy, 
+                 aes(x = Category, y = Value, group = Category), 
+                 inherit.aes = FALSE,
+                 position = position_nudge(x = 0.222),  # Adjust width to align with bars
+                 color = "black",  # Choose color to distinguish points
+                 fill = "#56B4E9",
+                 shape = 21,
+                 size = 1.5, 
+                 alpha = 0.5)
+}
+
+print(aggregate_bar_chart)
+
+aggregate_plot_filepath <- glue("{output_path_base}/{aggregate_bar_chart_name}")
+dir.create(dirname(aggregate_plot_filepath), recursive = TRUE, showWarnings = FALSE)
+
+ggsave(aggregate_plot_filepath, plot = aggregate_bar_chart, width = 8, height = 6, dpi = 500, bg = "white")
+```
+
+Create the legend for all plots with dummy data
+```{r}
+x <- 1:10
+df <- data.frame(
+    x = rep(x, 3),
+    y = c(x * 1.2, x * 0.8, x * 1.1),
+    group = factor(rep(c("Seurat Downsampled", "Scanpy Downsampled", "Seurat vs. Scanpy"), each = 10), levels = c("Seurat Downsampled", "Scanpy Downsampled", "Seurat vs. Scanpy")),
+    color = rep(c("#D55E00", "#56B4E9", NA), each = 10),
+    linetype = rep(c("solid", "solid", "dashed"), each = 10)
+)
+
+# Plot
+custom_legend <- ggplot(df, aes(x, y, group = group, color = group, linetype = group)) +
+    geom_line(linewidth = 0.5) +
+    scale_color_manual(values = c("Seurat Downsampled" = "#D55E00", "Scanpy Downsampled" = "#56B4E9", "Seurat vs. Scanpy" = "black")) +
+    scale_linetype_manual(values = c("Seurat Downsampled" = "solid", "Scanpy Downsampled" = "solid", "Seurat vs. Scanpy (defaults)" = "dashed")) +
+    theme(
+        text = element_text(family = "Arial"),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 12)
+    ) +
+    guides(color = guide_legend(override.aes = list(linetype = c("solid", "solid", "dashed"))))
+
+custom_legend
+
+custom_legend_filepath <- glue("{output_path_base}/line_plot_legend.tiff")
+
+ggsave(custom_legend_filepath, plot = custom_legend, dpi = 500, bg = "white")
+```

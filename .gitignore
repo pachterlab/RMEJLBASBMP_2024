@@ -1,0 +1,15 @@
+**/opt/**
+**/reference_files/**
+**/data/**
+**/output/**
+**/count_matrix_collection/**
+
+**/*.pyc
+
+**/.DS_Store
+
+**/.Rhistory
+
+**/.ipynb_checkpoints
+
+**/.virtual_documents

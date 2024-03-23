@@ -1,0 +1,26 @@
+project_base_path: "/workspace/analysis"
+seurat1_version: "5_0_2"  # str (with _ in place of .)
+seurat2_version: "4_3_0"  # str (with _ in place of .)
+
+data_name: "SC3_v3_NextGem_SI_PBMC_10K"
+save_data: TRUE
+
+# Don't have either name say "Seurat" or "Scanpy" or else helper functions will get confused
+seu1_name: "Seuratv5"
+seu2_name: "Seuratv4"
+
+output_base_path: ""  # "" for default - glue::glue("{project_base_path}/output/{data_name}/seuratv{seurat1_version}_vs_seuratv{seurat2_version}")
+
+dpi: 300
+
+doi: ""  # For downloading from CaltechDATA (not yet implemented)
+seuv5_version_control_file_link: "https://caltech.box.com/shared/static/8l5ggdz5bbrc9wdso8d6hsa2dvxv303s.gz"  # For downloading from Box
+seuv4_version_control_file_link: "https://caltech.box.com/shared/static/pdvw6s8d1sz4j0uu9xwrcqb10qekppmc.gz"  # For downloading from Box
+data_path_root: "/workspace/analysis/count_matrix_collection/SC3_v3_NextGem_SI_PBMC_10K/seurat_version_control"
+seuv5_data_name_from_download: "seuratv5"  # str
+seuv4_data_name_from_download: "seuratv4"  # str
+
+seu1_data_path: ""  # required if data_download == FALSE; optional if TRUE - for default - glue::glue("{data_path_root}/seuratv5/seu.rds")
+seu2_data_path: ""  # required if data_download == FALSE; optional if TRUE - for default - glue::glue("{data_path_root}/seuratv4/seu.rds")
+seu1_markers_data_path: ""  # required if data_download == FALSE; optional if TRUE - for default - glue::glue("{data_path_root}/seuratv5/markers.rds")
+seu2_markers_data_path: ""  # required if data_download == FALSE; optional if TRUE - for default - glue::glue("{data_path_root}/seuratv4/markers.rds")

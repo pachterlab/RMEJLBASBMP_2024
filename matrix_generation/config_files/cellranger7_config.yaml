@@ -1,0 +1,33 @@
+### General
+data_name: SC3_v3_NextGem_SI_PBMC_10K  # the python code to find this: fastq_link.split("/")[-2] OR filtered_feature_bc_matrix_link.split("/")[-2]
+seed_list: [0]
+frac_list: [1.0]
+count_matrix_generation_method: "cellranger"  # "kb" or "cellranger" or "both"; only used by main.py
+kb_version: ""  # "" for agnostic
+cellranger_version: "7.2.0"  # "" for agnostic
+matrix_folder_name: ""  # "" for default
+
+### kb ref/count
+kallisto_binary_path: ""  # "" for kallisto version in kb-python
+bustools_binary_path: ""  # "" for bustools version in kb-python
+kb_workflow: "standard"  # kb only: nac for unspliced + spliced (in addition to spliced only) (kb 28+ only), standard for spliced only
+kb_reference_folder_name: "placeholder"  # consider including date, kallisto version, and/or kb version in folder name
+
+### kb ref
+kb_d_list: ""   # "" for default (d-list with provided fasta file), None to exclude d-list
+ensembl_release: 111  # for kb ref
+
+### kb count
+kb_sequencing_technology: "10xv3"  # find on 10x website
+kb_count_strandedness: ""
+
+### cellranger count
+cellranger_reference_folder_name: "grch38_2020"
+cellranger_include_introns: ""   # "" for default; true or false
+cellranger_expect_cells: ""  # "" for default; integer
+
+### Links
+fastq_link: "https://s3-us-west-2.amazonaws.com/10x.files/samples/cell-exp/4.0.0/SC3_v3_NextGem_SI_PBMC_10K/SC3_v3_NextGem_SI_PBMC_10K_fastqs.tar"  # find on 10x website
+filtered_feature_bc_matrix_link: "https://cf.10xgenomics.com/samples/cell-exp/4.0.0/SC3_v3_NextGem_SI_PBMC_10K/SC3_v3_NextGem_SI_PBMC_10K_filtered_feature_bc_matrix.tar.gz"  # find on 10x website
+cellranger_package_link: "https://cf.10xgenomics.com/releases/cell-exp/cellranger-7.2.0.tar.gz?Expires=1707127361&Key-Pair-Id=APKAI7S6A5RYOXBWRPDA&Signature=epZfYDojgtvXKW9aMSJDDEqkMh2TPOycVlpV2sRd0DtwMOzeVFVK4slq3uCFwNWXRpE4gL~51tJ7tejEOAOtle6bcYIP093DvYbofAvST7mUaSPvBBplU8YDAlt1vgcEG0GrLKZtl10WCQrpfQUFIsrYJQsDwi5s60yWFRObEhLhMDN7US70IEvri1iSvG3ItgtPrcOvuo9JxgO-1j1S7LuZmcYQhGqMiR-iRw~FYdNhPX-rCacU-gqFu~IBqUF4~yI-UDKhLZUFV38O20JBGYLuvyPhG6FE3AbeKFUX7W6-2iP4neCqNVFlBqTOxGEWd0qCYESnsXD9eEckaBQXWA__"   # find here: https://www.10xgenomics.com/support/software/cell-ranger/downloads/previous-versions
+cellranger_transcriptome_link: "https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2020-A.tar.gz"

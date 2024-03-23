@@ -1,0 +1,214 @@
+---
+title: "Download data"
+author: "Lambda Moses"
+date: "2023-09-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Link generated count matrix in the correct place if exists
+```{r}
+data_name <- "SC3_v3_NextGem_SI_PBMC_10K"
+matrix_generation_method <- "kb" # "kb" or "cellranger"
+matrix_generation_method_version <- "0_28_0" # version number or empty string
+
+# if (matrix_source == "generated") {
+#     matrix_generation_method_version_foldername <- gsub("\\.", "_", matrix_generation_method_version)
+# 
+#     source_path <- paste0("../matrix_generation/count_matrix_collection/", data_name, "/", matrix_generation_method, matrix_generation_method_version, "_raw_feature_bc_matrix_collection")
+#     destination_path <- paste0("./count_matrix_collection/", data_name)
+# 
+#     if (dir.exists(source_path)) {
+#         if (!dir.exists(destination_path)) {
+#             dir.create(destination_path, recursive = TRUE, showWarnings = FALSE)
+#         }
+#         # file.copy(source_path, destination_path, recursive = TRUE)
+#         # ! add if-else where if colab then download matrix from caltech data, else make symlink
+#         file.symlink(source_path, destination_path)
+#         file.rename(file.path(destination_path, basename(source_path)), file.path(destination_path, paste0(matrix_generation_method, matrix_generation_method_version, "_raw_generated")))
+#         cat("Directory linked successfully.\n")
+#     } else {
+#         cat("Source directory does not exist.\n")
+#     }
+# }
+```
+
+Install packages
+```{r}
+if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
+
+if (!requireNamespace("tidyverse", quietly = TRUE)) remotes::install_version("tidyverse", version = "2.0.0", upgrade = "never")
+if (!requireNamespace("rmarkdown", quietly = TRUE)) remotes::install_version("rmarkdown", version = "2.25", upgrade = "never")
+
+seurat_version_for_download = "5.0.2"
+if (!requireNamespace("Seurat", quietly = TRUE)) remotes::install_version("Seurat", version = seurat_version_for_download, upgrade = "never")
+if (!requireNamespace("Matrix", quietly = TRUE)) remotes::install_version("Matrix", version = "1.6.4", upgrade = "never")
+if (!requireNamespace("reticulate", quietly = TRUE)) remotes::install_version("reticulate", version = "1.34.0", upgrade = "never")
+if (!requireNamespace("patchwork", quietly = TRUE)) remotes::install_version("patchwork", version = "1.1.3", upgrade = "never")
+if (!requireNamespace("eulerr", quietly = TRUE)) remotes::install_version("eulerr", version = "7.0.0", upgrade = "never")
+if (!requireNamespace("scattermore", quietly = TRUE)) remotes::install_version("scattermore", version = "1.2", upgrade = "never")
+if (!requireNamespace("assertthat", quietly = TRUE)) remotes::install_version("assertthat", version = "0.2.1", upgrade = "never")
+if (!requireNamespace("pheatmap", quietly = TRUE)) remotes::install_version("pheatmap", version = "1.0.12", upgrade = "never")
+if (!requireNamespace("ggforce", quietly = TRUE)) remotes::install_version("ggforce", version = "0.4.1", upgrade = "never")
+if (!requireNamespace("ggplotify", quietly = TRUE)) remotes::install_version("ggplotify", version = "0.1.2", upgrade = "never")
+if (!requireNamespace("mclust", quietly = TRUE)) remotes::install_version("mclust", version = "6.0.1", upgrade = "never")
+if (!requireNamespace("ggalluvial", quietly = TRUE)) remotes::install_version("ggalluvial", version = "0.12.5", upgrade = "never")
+if (!requireNamespace("UpSetR", quietly = TRUE)) remotes::install_version("UpSetR", version = "1.4.0", upgrade = "never")
+if (!requireNamespace("ggpointdensity", quietly = TRUE)) remotes::install_version("ggpointdensity", version = "0.1.0", upgrade = "never")
+if (!requireNamespace("dbscan", quietly = TRUE)) remotes::install_version("dbscan", version = "1.1.12", upgrade = "never")
+if (!requireNamespace("presto", quietly = TRUE)) remotes::install_github("immunogenomics/presto@31dc97f", upgrade = "never")
+
+
+if (!requireNamespace("BiocManager", quietly = TRUE)) remotes::install_version("BiocManager", version = "1.30.22", upgrade = "never")
+bioconductor_version <- "3.18"
+
+if (!requireNamespace("BUSpaRse", quietly = TRUE)) BiocManager::install("BUSpaRse", version = bioconductor_version, update = FALSE)
+if (!requireNamespace("DropletUtils", quietly = TRUE)) BiocManager::install("DropletUtils", version = bioconductor_version, update = FALSE)
+if (!requireNamespace("biomaRt", quietly = TRUE)) BiocManager::install("biomaRt", version = bioconductor_version, update = FALSE)
+if (!requireNamespace("bluster", quietly = TRUE)) BiocManager::install("bluster", version = bioconductor_version, update = FALSE)
+```
+
+Set up conda environment
+```{r}
+scanpy_version_for_download <- "1.4.6"
+umap_learn_version <- "0.4.6"
+
+conda_binary <- "auto"
+conda_env_name <- "scanpy14_umap4"
+yaml_path <- NULL
+```
+
+```{r}
+scanpy_minor_version <- as.integer(strsplit(scanpy_version_for_download, split = "\\.")[[1]][2])
+umap_minor_version <- as.integer(strsplit(umap_learn_version, split = "\\.")[[1]][2])
+
+library(reticulate)
+
+if (!(conda_env_name %in% conda_list(conda_binary)$name)) {
+    conda_create(envname = conda_env_name, python_version = "3.9", conda = conda_binary)
+    
+    if (scanpy_minor_version >= 5) {
+        conda_install(
+            conda = conda_binary,
+            envname = conda_env_name,
+            channel = "conda-forge",
+            c(
+                "scanpy==1.9.5",
+                "python-igraph==0.10.8",
+                "leidenalg==0.10.1",
+                "pandas==2.1.1",
+                "matplotlib==3.7.2",
+                "numpy==1.23.4",
+                "anndata==0.10.2",
+                "hdf5plugin==4.2.0"
+            )
+        )
+    
+        conda_install(
+            conda = conda_binary,
+            envname = conda_env_name,
+            pip = TRUE,
+            c(
+                "kb-python==0.27.3",
+                "umap-learn==0.5.2",
+                "louvain==0.8.1"
+            )
+        )
+    } else if (scanpy_minor_version < 5 && umap_minor_version < 5) {
+        conda_install(
+            conda = conda_binary,
+            envname = conda_env_name,
+            pip = TRUE,
+            c(
+                "scanpy==1.4.6",
+                "matplotlib==3.6.3",
+                "pandas==2.1.1",
+                "anndata==0.10.2"
+                # "kb-python==0.27.3"
+            )
+        )
+        
+        conda_install(
+            conda = conda_binary,
+            envname = conda_env_name,
+            channel = "conda-forge",
+            c(
+                "python-igraph==0.10.8",
+                "leidenalg==0.10.1",
+                "hdf5plugin==4.2.0"
+            )
+        )
+        
+        conda_install(
+            conda = conda_binary,
+            envname = conda_env_name,
+            pip = TRUE,
+            c(
+                "umap-learn==0.4.6",
+                "louvain==0.8.1"
+            )
+        )
+        
+        conda_install(
+            conda = conda_binary,
+            envname = conda_env_name,
+            channel = "conda-forge",
+            c(
+                "llvmdev==8.0.0"
+            )
+        )
+        
+        binary_path <- conda_list(conda_binary)$python[conda_list(conda_binary)$name == conda_env_name]
+        llvm_path <- sub("python$", "llvm-config", binary_path)
+        
+        Sys.setenv(LLVM_CONFIG = llvm_path)
+        
+        conda_install(conda = conda_binary, envname = conda_env_name, pip = TRUE, "numba==0.49.1")
+        
+        conda_install(conda = conda_binary, envname = conda_env_name, pip = TRUE, "pynndescent==0.4.7")
+        
+        conda_install(conda = conda_binary, envname = conda_env_name, pip = TRUE, "numpy==1.23.0")
+        
+        conda_install(conda = conda_binary, envname = conda_env_name, pip = TRUE, "pandas==1.5.3")
+    } else {
+        conda_install(
+            conda = conda_binary,
+            envname = conda_env_name,
+            channel = "conda-forge",
+            c(
+                "python-igraph==0.10.8",
+                "leidenalg==0.10.1",
+                "hdf5plugin==4.2.0"
+            )
+        )
+        
+        conda_install(
+            conda = conda_binary,
+            envname = conda_env_name,
+            pip = TRUE,
+            c(
+                "scanpy==1.4.6",
+                "matplotlib==3.6.3",
+                "numpy==1.23.4",
+                "pandas==1.5.3",
+                "anndata==0.10.2",
+                "kb-python==0.27.3",
+                "umap-learn==0.5.2",
+                "louvain==0.8.1"
+            )
+        )
+    }
+} else {
+    conda_create(environment = yaml_path)
+}
+
+binary_path <- conda_list(conda_binary)$python[conda_list(conda_binary)$name == conda_env_name]
+conda_pip_path <- sub("python$", "pip", binary_path)
+
+cmd <- sprintf('%s install git+https://github.com/has2k1/scikit-misc.git@269f61e', conda_pip_path)
+
+system(cmd)
+```
