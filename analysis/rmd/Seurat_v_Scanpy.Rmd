@@ -173,34 +173,34 @@ file_paths <- list(
     FC_histogram_signed_file_path = FALSE # glue::glue("{output_base_path}/plots/FC_histogram_signed.tiff")
 )
 
-# if (save_data) {
-#     for (path in output_data_file_paths) {
-#         dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
-#     }
-# 
-#     for (path in file_paths) {
-#         if (is.character(path)) {
-#             # Extract the directory part of the path
-#             specific_output_path <- dirname(path)
-# 
-#             # Create the directory if it does not exist
-#             if (!dir.exists(specific_output_path)) {
-#                 dir.create(specific_output_path, recursive = TRUE, showWarnings = FALSE)
-#             }
-#         }
-#     }
-# 
-#     for (file in c(file_paths$euler_stats_after_QC_file, file_paths$pca_knn_clustering_umap_file, file_paths$de_stats_file)) {
-#         if (is.character(file)) {
-#             sink(file = file, append = FALSE)
-#             sink()
-#         }
-#     }
-# } else {
-#     for (i in seq_along(file_paths)) {
-#         file_paths[[i]] <- FALSE
-#     }
-# }
+if (save_data) {
+    for (path in output_data_file_paths) {
+        dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+    }
+
+    for (path in file_paths) {
+        if (is.character(path)) {
+            # Extract the directory part of the path
+            specific_output_path <- dirname(path)
+
+            # Create the directory if it does not exist
+            if (!dir.exists(specific_output_path)) {
+                dir.create(specific_output_path, recursive = TRUE, showWarnings = FALSE)
+            }
+        }
+    }
+
+    for (file in c(file_paths$euler_stats_after_QC_file, file_paths$pca_knn_clustering_umap_file, file_paths$de_stats_file)) {
+        if (is.character(file)) {
+            sink(file = file, append = FALSE)
+            sink()
+        }
+    }
+} else {
+    for (i in seq_along(file_paths)) {
+        file_paths[[i]] <- FALSE
+    }
+}
 ```
 
 R Imports

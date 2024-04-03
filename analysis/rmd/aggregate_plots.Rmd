@@ -6,7 +6,7 @@ date: "2024-01-01"
 
 Select yaml file
 ```{r}
-yaml_file <- "Fig2_Supp_Fig12_cell"  # Fig2_Supp_Fig11_read, Fig2_Supp_Fig12_cell
+yaml_file <- "Fig2_Supp_Fig11_read"  # Fig2_Supp_Fig11_read, Fig2_Supp_Fig12_cell
 ```
 
 Load contents of yaml file into global R environment
@@ -862,17 +862,17 @@ long_bar_chart$value <- ifelse(long_bar_chart$value < min(frac_list), min(frac_l
 
 long_bar_chart$variable <- factor(long_bar_chart$variable, levels = c("Seurat", "Scanpy"))
 
-
+number_above_bar_text_size <- ifelse(type_downsampled == "read", 3, 4.5)
 
 aggregate_bar_chart <- ggplot(long_bar_chart, aes(x = Category, y = value, fill = variable)) +
     geom_bar(stat = "identity", position = position_dodge()) +
-    # geom_text(aes(label = round(value, 2)),
-    #           position = position_dodge(width = 0.9),   # Adjust the position to align with the bars
-    #           vjust = -0.5,                             # Negative value for vertical adjustment to move text above bars
-    #           color = "black",                          # Text color
-    #           size = 3) +
+    geom_text(aes(label = round(value, 2)),
+              position = position_dodge(width = 0.9),   # Adjust the position to align with the bars
+              vjust = -0.65,                             # Negative value for vertical adjustment to move text above bars
+              color = "black",                          # Text color
+              size = number_above_bar_text_size) +
     scale_fill_manual(values = c("Seurat" = "#D55E00", "Scanpy" = "#56B4E9")) +
-    labs(x = "", y = glue("Fraction of {tools::toTitleCase(type_downsampled)}s Needed"), fill = "Package") +
+    labs(x = "", y = glue("Fraction of {tools::toTitleCase(type_downsampled)}s that Suffice"), fill = "Package") +
     coord_cartesian(ylim = c(0, 1)) +
     theme_minimal() +
     guides(fill = guide_legend(title = NULL)) +
@@ -880,7 +880,7 @@ aggregate_bar_chart <- ggplot(long_bar_chart, aes(x = Category, y = value, fill 
         text = element_text(family = "Arial"),
         legend.position = "none",
         legend.text = element_text(size = rel(1.45)),
-        axis.text.x = element_text(angle = 45, hjust = 1, size = rel(1.2)),
+        axis.text.x = element_text(angle = 45, hjust = 1, size = rel(1.4)),
         axis.title = element_text(size = rel(1.45))
     ) # Rotate x-axis labels if needed
 
