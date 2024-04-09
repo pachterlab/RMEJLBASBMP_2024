@@ -6,7 +6,7 @@ date: "2024-01-01"
 
 Select yaml file
 ```{r}
-yaml_file <- "Fig1"  # Fig1, Supp_Fig2, Supp_Fig3, Supp_Fig4, Supp_Fig5
+yaml_file <- "Supp_Fig5"  # Fig1, Supp_Fig2, Supp_Fig3, Supp_Fig4, Supp_Fig5
 ```
 
 Load contents of yaml file into global R environment
@@ -267,6 +267,7 @@ if (analysis_methods == "default" || analysis_methods == "seurat_like") {
     seu_vars_to_regress <- NULL
     seurat_scale_max <- 10
     seu_n_neighbors <- 20
+    # use newly-generated knn graph for umap
     seurat_clustering_algorithm <- "louvain"
     seu_resolution <- 0.8
     seu_umap_method <- "uwot"
@@ -280,6 +281,7 @@ if (analysis_methods == "default" || analysis_methods == "seurat_like") {
     seu_vars_to_regress <- c("nCount_RNA", "pct_mt")
     seurat_scale_max <- Inf
     seu_n_neighbors <- 15
+    # use snn graph for umap
     seurat_clustering_algorithm <- "leiden"
     seu_resolution <- 1
     seu_umap_method <- "umap-learn"
@@ -922,6 +924,7 @@ if (use_seu_knn_custom_seed) {
 
 ```{r}
 seu <- FindNeighbors(seu, reduction = "pca", dims = 1:seu_num_pcs, k.param = seu_n_neighbors)
+
 snn_graph_seu <- seu@graphs$RNA_snn
 knn_graph_seu <- seu@graphs$RNA_nn
 ```

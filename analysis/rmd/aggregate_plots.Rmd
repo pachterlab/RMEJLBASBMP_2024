@@ -862,13 +862,13 @@ long_bar_chart$value <- ifelse(long_bar_chart$value < min(frac_list), min(frac_l
 
 long_bar_chart$variable <- factor(long_bar_chart$variable, levels = c("Seurat", "Scanpy"))
 
-number_above_bar_text_size <- ifelse(type_downsampled == "read", 3, 4.5)
+number_above_bar_text_size <- ifelse(type_downsampled == "read", 2.5, 4)
 
 aggregate_bar_chart <- ggplot(long_bar_chart, aes(x = Category, y = value, fill = variable)) +
     geom_bar(stat = "identity", position = position_dodge()) +
-    geom_text(aes(label = round(value, 2)),
+    geom_text(aes(label = ifelse(value == 0.01, "<0.01", round(value, 2))),
               position = position_dodge(width = 0.9),   # Adjust the position to align with the bars
-              vjust = -0.65,                             # Negative value for vertical adjustment to move text above bars
+              vjust = -0.7,                             # Negative value for vertical adjustment to move text above bars
               color = "black",                          # Text color
               size = number_above_bar_text_size) +
     scale_fill_manual(values = c("Seurat" = "#D55E00", "Scanpy" = "#56B4E9")) +
