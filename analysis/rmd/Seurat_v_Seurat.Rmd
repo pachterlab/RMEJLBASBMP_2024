@@ -12,7 +12,7 @@ params:
 
 Select yaml file
 ```{r}
-yaml_file <- "Fig3_cellranger"  # Fig3_cellranger, Supp_Fig7, Supp_Fig7_DE, Supp_Fig9, Supp_Fig13, Supp_Fig14, Supp_Fig16_seu, Supp_Seurat_version4
+yaml_file <- "custom"  # Fig3_cellranger, Supp_Fig7, Supp_Fig7_DE, Supp_Fig9, Supp_Fig13, Supp_Fig14, Supp_Fig16_seu, Supp_Seurat_version4
 ```
 
 Load contents of yaml file into global R environment
@@ -497,6 +497,30 @@ UMI scatterplot between the two groups
 ```{r}
 umi_scatterplot <- make_umi_scatterplot(res_mat1 = res_mat1, res_mat2 = res_mat2, UMI_cutoff1 = UMI_cutoff1, UMI_cutoff2 = UMI_cutoff2, res_mat1_name = seurat_group_names$Seurat1, res_mat2_name = seurat_group_names$Seurat2, point_density = FALSE, color_points = FALSE, save = file_paths$umi_scatterplot) # set point_density = TRUE for finer-grained point density
 umi_scatterplot
+```
+
+```{r}
+# Sum expressions across cells for each gene in both matrices
+common_genes <- intersect(rownames(res_mat1), rownames(res_mat2))
+
+umi_counts_res_mat <- rowSums(res_mat1[common_genes,])
+umi_counts_res_mat2 <- rowSums(res_mat2[common_genes,])
+
+data_for_plot <- data.frame(
+    Gene = common_genes,
+    UMI_Counts_res_mat1 = umi_counts_res_mat,
+    UMI_Counts_res_mat2 = umi_counts_res_mat2
+)
+
+# Fit linear model
+fit <- lm(umi_counts_res_mat2 ~ umi_counts_res_mat)
+
+# Plot the data and the fit
+plot(umi_counts_res_mat, umi_counts_res_mat2, main = "Gene Expression Correlation",
+     xlab = "Summed Expressions res_mat1", ylab = "Summed Expressions res_mat2")
+abline(fit, col = "red")
+
+summary(fit)$r.squared
 ```
 
 Find list of mitochondrial Ensembl gene names
