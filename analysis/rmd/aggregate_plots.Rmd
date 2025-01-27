@@ -943,3 +943,4 @@ custom_legend_filepath <- glue("{output_path_base}/line_plot_legend.tiff")
 
 ggsave(custom_legend_filepath, plot = custom_legend, dpi = 500, bg = "white")
 ```
+

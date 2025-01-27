@@ -1,0 +1,430 @@
+---
+title: "aggregate_plots"
+output: html_document
+date: "2024-01-01"
+---
+
+Select yaml file
+```{r}
+yaml_file <- "Supp_Fig18"  # Supp_Fig18
+```
+
+Load contents of yaml file into global R environment
+```{r}
+yaml_dir <- glue::glue("{dirname(getwd())}/yaml")
+
+yaml_file_path <- glue::glue("{yaml_dir}/{yaml_file}.yaml")
+
+config <- yaml::read_yaml(yaml_file_path)
+
+for (name in names(config)) {
+    assign(name, config[[name]], envir = .GlobalEnv)
+}
+
+print(glue::glue("bootstrapped_seeds_list = [{toString(bootstrapped_seeds_list)}]. Please make sure you have run each of these bootstrapped seeds before running this notebook."))
+```
+
+```{r}
+type_downsampled <- "read"
+
+if (bootstrapped_data_path == "") {
+    bootstrapped_data_path <- glue::glue("{project_base_path}/count_matrix_collection/{data_name}/bootstrapped_stats")
+}
+
+if (data_path_root == "") {
+    data_path_root <- glue::glue("{project_base_path}/count_matrix_collection/{data_name}")
+}
+```
+
+
+```{r}
+Sys.setenv(RETICULATE_PYTHON = paste("/home/rstudio/.conda/envs", conda_env, "bin/python3.9", sep = "/"))
+library(reticulate)
+use_condaenv(conda_env)
+library(tidyverse)
+library(glue)
+theme_set(theme_bw())
+
+source(glue("{project_base_path}/scripts/data_analysis_helper.R"))
+```
+
+```{r}
+if (bootstrapped_data_file_link != "" && (!dir.exists(bootstrapped_data_path) || length(list.files(bootstrapped_data_path)) == 0)) {
+    bootstrapped_data_path <- download_box(bootstrapped_data_file_link, data_name_from_download, data_path_root)
+}
+```
+
+```{python}
+import sys
+sys.path.append(f"{r.project_base_path}/scripts")
+from download_data import *
+
+if not r.doi == "" and (not os.path.exists(r.bootstrapped_data_path) or not os.listdir(r.bootstrapped_data_path)):
+    download_and_extract(r.doi, r.data_name_from_download, r.data_path_root)
+```
+
+```{r}
+get_stats_filepath <- function(set, frac_str, package, type_downsampled, seed) {
+    if (package == "seu") {
+        package_full_name <- "seurat"
+        package_version <- seurat_version
+    } else if (package == "scan") {
+        package_full_name <- "scanpy"
+        package_version <- scanpy_version
+    }
+
+    if (type_downsampled == "read") {
+        downsample_string <- glue("cell_fraction_1_0/read_fraction_{package}1_1_0_vs_{package}2_{frac_str}_seed{seed}")
+    } else if (type_downsampled == "cell") {
+        downsample_string <- glue("cell_fraction_{package}1_1_0_vs_{package}2_{frac_str}_seed{seed}/read_fraction_1_0")
+    }
+
+    if (set$file_name == "de_stats.txt" && set$statistic_name != "Marker Genes Jaccard") {
+        data_input_for_filepath <- glue("{package}1")
+    } else {
+        data_input_for_filepath <- "default"
+    }
+
+    return(glue("{bootstrapped_data_path}/{package_full_name}v{package_version}/input_{data_input_for_filepath}/{matrix_generation}/{downsample_string}/stats/{set$file_name}"))
+}
+```
+
+List of all metrics to extract - Seurat vs Scanpy
+```{r}
+variable_sets <- list(
+    list(
+        statistic_name = "Cells jaccard",
+        file_name = "euler_stats_afterQC.txt",
+        extraction_phrase = "Cells Jaccard: ",
+        baseline_value_seurat_vs_scanpy_default = 1,
+        baseline_value_seurat_vs_scanpy_same_input = NA,
+        ideal_value = 1,
+        output_plot_name = "cells.tiff",
+        additional_baseline_values = NA
+    ),
+    list(
+        statistic_name = "Genes jaccard",
+        file_name = "euler_stats_afterQC.txt",
+        extraction_phrase = "Genes Jaccard: ",
+        baseline_value_seurat_vs_scanpy_default = 1,
+        baseline_value_seurat_vs_scanpy_same_input = NA,
+        ideal_value = 1,
+        output_plot_name = "genes.tiff",
+        additional_baseline_values = NA
+    ),
+    list(
+        statistic_name = "HVGs jaccard",
+        file_name = "euler_stats_afterQC.txt",
+        extraction_phrase = "HVGs Jaccard: ",
+        baseline_value_seurat_vs_scanpy_default = 0.22249151720795,
+        baseline_value_seurat_vs_scanpy_same_input = NA,
+        ideal_value = 1,
+        output_plot_name = "hvgs.tiff",
+        additional_baseline_values = NA,
+        additional_baseline_values = NA
+    ),
+    list(
+        statistic_name = "Mean ΔPC1-3 loadings",
+        file_name = "pca_knn_clustering_umap_stats.txt",
+        extraction_phrase = "Mean loading difference of PC1-3: ",
+        baseline_value_seurat_vs_scanpy_default = 0.417599195296815,
+        baseline_value_seurat_vs_scanpy_same_input = NA,
+        ideal_value = 0,
+        output_plot_name = "pca.tiff",
+        additional_baseline_values = NA
+    ),
+    list(
+        statistic_name = "Median log SNN degree ratio",
+        file_name = "pca_knn_clustering_umap_stats.txt",
+        extraction_phrase = "Median magnitude of log degree ratio of SNN: ",
+        baseline_value_seurat_vs_scanpy_default = 2.05889368905357,
+        baseline_value_seurat_vs_scanpy_same_input = NA,  # 2.04306872189189,
+        ideal_value = 0,
+        output_plot_name = "knn.tiff",
+        additional_baseline_values = NA
+    ),
+    list(
+        statistic_name = "Clustering ARI",
+        file_name = "pca_knn_clustering_umap_stats.txt",
+        extraction_phrase = "Adjusted Rand index between clusters: ",
+        baseline_value_seurat_vs_scanpy_default = 0.706349552155871,
+        baseline_value_seurat_vs_scanpy_same_input = NA,  # 0.87916666950325,
+        ideal_value = 1,
+        output_plot_name = "clustering.tiff",
+        additional_baseline_values = NA
+    ),
+    list(
+        statistic_name = "Median jaccard of UMAP KNN",
+        file_name = "pca_knn_clustering_umap_stats.txt",
+        extraction_phrase = "Median jaccard of UMAP KNN: ",
+        baseline_value_seurat_vs_scanpy_default = 0.0638297872340425,
+        baseline_value_seurat_vs_scanpy_same_input = NA,  # 0.204819277108434,
+        ideal_value = 1,
+        output_plot_name = "umap.tiff",
+        additional_baseline_values = NA
+    ),
+    list(
+        statistic_name = "Marker Genes Jaccard",
+        file_name = "de_stats.txt",
+        extraction_phrase = "Marker Genes Jaccard: ",
+        baseline_value_seurat_vs_scanpy_default = 0.615919763464549,    # 
+        baseline_value_seurat_vs_scanpy_same_input = NA,  # 0.475609756097561,
+        ideal_value = 1,
+        output_plot_name = "marker_genes.tiff",
+        additional_baseline_values = list(seurat_versions = 0.3252698, scanpy_versions = 0.09875534, cellranger_versions = 0.7861588)
+    ),
+    list(
+        statistic_name = "Markers Jaccard",
+        file_name = "de_stats.txt",
+        extraction_phrase = "Markers Jaccard: ",
+        baseline_value_seurat_vs_scanpy_default = NA,
+        baseline_value_seurat_vs_scanpy_same_input = 0.222991819976808,
+        ideal_value = 1,
+        output_plot_name = "markers.tiff",
+        additional_baseline_values = list(seurat_versions = 0.2235825, scanpy_versions = 0.003134109, cellranger_versions = 0.6504344)
+    ),
+    list(
+        statistic_name = "logFC CCC",
+        file_name = "de_stats.txt",
+        extraction_phrase = "logFC CCC: ",
+        baseline_value_seurat_vs_scanpy_default = NA,
+        baseline_value_seurat_vs_scanpy_same_input = 0.980466856603784,
+        ideal_value = 1,
+        output_plot_name = "logfc.tiff",
+        additional_baseline_values = list(seurat_versions = 0.44, scanpy_versions = 1.0, cellranger_versions = 0.97)
+    ),
+    list(
+        statistic_name = "Adj p-value flip rate",
+        file_name = "de_stats.txt",
+        extraction_phrase = "Adjusted p value, fraction that flipped across 0.05 threshold: ",
+        baseline_value_seurat_vs_scanpy_default = NA,
+        baseline_value_seurat_vs_scanpy_same_input = 0.2,
+        ideal_value = 0,
+        output_plot_name = "pvaladj.tiff",
+        additional_baseline_values = list(seurat_versions = 0.44, scanpy_versions = 1.0, cellranger_versions = 0.132049173231755)
+    )
+) 
+```
+
+
+```{r}
+# variable_sets <- list(
+#     list(
+#         statistic_name = "Clustering ARI",
+#         file_name = "pca_knn_clustering_umap_stats.txt",
+#         extraction_phrase = "Adjusted Rand index between clusters: ",
+#         baseline_value_seurat_vs_scanpy_default = 0.706349552155871,
+#         baseline_value_seurat_vs_scanpy_same_input = NA,  # 0.87916666950325,
+#         ideal_value = 1,
+#         output_plot_name = "clustering.tiff",
+#         additional_baseline_values = NA
+#     )
+# )
+
+# define output dir
+output_path_base <- glue("{project_base_path}/output/{data_name}/bootstrapped_plots/seurat_vs_scanpy")
+p_value_text_path <- glue("{output_path_base}/p_values.txt")
+dir.create(dirname(p_value_text_path), recursive = TRUE, showWarnings = FALSE)
+
+for (set in variable_sets) {
+    results_df <- data.frame(value_group1 = numeric(), value_group2 = numeric(), seed = numeric())  # initialize empty df
+
+    output_plot_filepath <- glue("{output_path_base}/{set$output_plot_name}")
+
+    for (package in c("seu", "scan")) {
+    
+        for (seed in bootstrapped_seeds_list) {
+            stats_path <- get_stats_filepath(set, frac_str = "1_0", package = package, type_downsampled = type_downsampled, seed = seed)  # get stats path
+
+            # Read the file lines
+            lines <- readLines(stats_path)
+
+            value_line <- grep(set$extraction_phrase, lines, value = TRUE)  # grab relevant value
+
+            # Extract the numerical variance using string manipulation
+            value <- as.numeric(str_extract(value_line, "(?<=: )\\d+(\\.\\d+)?(e[-+]?\\d+)?"))
+
+            if (package == "seu") {
+                new_row <- data.frame(value_group1 = value, value_group2 = NA, seed = seed)
+            } else if (package == "scan") {
+                new_row <- data.frame(value_group1 = NA, value_group2 = value, seed = seed)
+            }
+            # Add the results to the data frame
+            results_df <- rbind(results_df, new_row)
+        }
+    }
+    
+    # Observed value (Seurat vs Scanpy)
+    if (!is.na(set$baseline_value_seurat_vs_scanpy_default)) {
+        seurat_vs_scanpy_value <- set$baseline_value_seurat_vs_scanpy_default
+    } else if (!is.na(set$baseline_value_seurat_vs_scanpy_same_input)) {
+        seurat_vs_scanpy_value <- set$baseline_value_seurat_vs_scanpy_same_input
+    } else {
+        seurat_vs_scanpy_value <- NA
+    }
+    
+    # convert into long df
+    results_long <- results_df %>%
+      pivot_longer(cols = starts_with("value_group"), 
+                   names_to = "group", 
+                   values_to = "value", 
+                   values_drop_na = TRUE)
+    
+    if (set$statistic_name == "logFC CCC") {
+        y_axis_min <- -1
+    } else {
+        y_axis_min <- 0
+    }
+    
+    y_axis_max <- max(1, set$baseline_value_seurat_vs_scanpy_default, set$baseline_value_seurat_vs_scanpy_same_input, max(results_long$value, na.rm = TRUE), na.rm = TRUE)
+    
+    # Calculate the summed error new value for each seed and add it as new rows
+    results_long <- results_long %>%
+      group_by(seed) %>%
+      summarise(value = sum(value - set$ideal_value) + set$ideal_value, .groups = "drop") %>%
+      mutate(group = "value_summed_error") %>%
+      bind_rows(results_long) %>%
+      arrange(factor(group, levels = c("value_group1", "value_group2", "value_summed_error"))) %>%  # Ensure "value_summed_error" rows are last
+      mutate(group = factor(group, levels = c("value_group1", "value_group2", "value_summed_error")))
+    
+    # grab these summed error values into a list
+    seurat_and_scanpy_bootstrapped_summed_error_values <- results_long %>%
+      filter(group == 'value_summed_error') %>%
+      pull(value)
+    
+    # Perform a two-tailed t-test
+    t_test_result <- t.test(
+      x = seurat_and_scanpy_bootstrapped_summed_error_values,        # Null distribution values
+      mu = seurat_vs_scanpy_value,                    # Hypothesized mean
+      alternative = "two.sided"     # two-tailed test
+    )
+    
+    p_value <- t_test_result$p.value
+    
+    # # Perform the Wilcoxon signed-rank test
+    # wilcox_result <- wilcox.test(seurat_and_scanpy_bootstrapped_summed_error_values, mu = seurat_vs_scanpy_value, alternative = "greater")  # change "greater" based on test
+    # p_value <- wilcox_result$p.value
+    
+    # Append the line to the file
+    cat(sprintf("%s: %.4f\n", set$statistic_name, p_value), 
+        file = p_value_text_path, 
+        append = TRUE)
+    
+    if (class(set$additional_baseline_values) != "logical") {
+        for (key in names(set$additional_baseline_values)) {
+            output_path_base_additional <- glue("{project_base_path}/output/{data_name}/bootstrapped_plots/{key}")
+            p_value_text_path_additional <- glue("{output_path_base_additional}/p_values.txt")
+            dir.create(dirname(p_value_text_path_additional), recursive = TRUE, showWarnings = FALSE)
+            
+            baseline_value <- set$additional_baseline_values[[key]]
+            
+            t_test_result <- t.test(
+              x = seurat_and_scanpy_bootstrapped_summed_error_values,        # Null distribution values
+              mu = baseline_value,                    # Hypothesized mean
+              alternative = "two.sided"     # two-tailed test
+            )
+            
+            additional_p_value <- t_test_result$p.value
+            
+            # Append the line to the file
+            cat(sprintf("%s: %.4f\n", set$statistic_name, additional_p_value), 
+                file = p_value_text_path_additional, 
+                append = TRUE)
+        }
+    }
+    
+    # drop summed error values from plot if show_summed_error is not TRUE
+    if (show_summed_error != TRUE) {
+        results_long <- results_long %>%
+            filter(group != 'value_summed_error')
+    }
+    
+    # Create the bar chart
+    p <- ggplot(results_long, aes(x = factor(seed), y = value, color = group, group = group)) +
+        geom_line(size = 0.8) +
+        geom_point(size = 3) +
+        scale_color_manual(values = c("value_group1" = "#D55E00", "value_group2" = "#56B4E9", "value_summed_error" = "black")) +
+        xlab(glue("Bootstrap seed")) +
+        ylab(set$statistic_name) +
+        theme_minimal() + 
+        theme(
+                text = element_text(family = "Arial"),
+                legend.position = "none",
+                axis.text.x = element_text(size = rel(1)),
+                axis.text.y = element_text(size = rel(1)), # Increase axis tick labels size
+                axis.title = element_text(size = rel(1.45))
+        ) + 
+        scale_y_continuous(
+                limits = c(y_axis_min, y_axis_max), # Setting y-axis limits from 0 to 1
+                breaks = seq(y_axis_min, y_axis_max, by = 0.2), # Major ticks every 0.2
+                minor_breaks = seq((y_axis_min + 0.1), (y_axis_max - 0.1), by = 0.2)
+        ) + 
+        coord_cartesian(ylim = c(0, y_axis_max)) +
+        
+    
+    
+    if (set$statistic_name == "Median log SNN degree ratio" && type_downsampled == "cell") {
+        p <- p +
+            scale_y_continuous(
+                limits = c(y_axis_min, y_axis_max), # Setting y-axis limits from 0 to 1
+                breaks = seq(y_axis_min, y_axis_max, by = 1), # Major ticks every 0.2
+                minor_breaks = seq((y_axis_min + 0.5), (y_axis_max - 0.5), by = 0.5)
+            )
+    }
+    
+    if (!is.na(set$baseline_value_seurat_vs_scanpy_default)) {
+        p <- p +
+            geom_hline(aes(yintercept = set$baseline_value_seurat_vs_scanpy_default), color = "black", linetype = "dashed", linewidth = 0.5) # +
+        # annotate("text", x = 1, y = (set$baseline_value_seurat_vs_scanpy_default + 0.1), label = glue("Seurat vs Scanpy, full-size datasets"), hjust = 1, color = "black") +
+    }
+    
+    if (!is.na(set$baseline_value_seurat_vs_scanpy_same_input)) {
+        p <- p +
+            geom_hline(aes(yintercept = set$baseline_value_seurat_vs_scanpy_same_input), color = "black", linetype = "dashed", linewidth = 0.5) # +
+        # annotate("text", x = 1, y = (set$baseline_value_seurat_vs_scanpy_same_input + 0.1), label = glue("Seurat vs Scanpy, full-size datasets"), hjust = 1, color = "black") +
+    }
+    
+    print(p)
+    
+    dir.create(dirname(output_plot_filepath), recursive = TRUE, showWarnings = FALSE)
+    ggsave(output_plot_filepath, plot = p, dpi = 500, bg = "white", width = 2100, height = 2100, units = "px")
+    
+}
+```
+
+
+
+```{r}
+
+```
+
+Create the legend for all plots with dummy data
+```{r}
+x <- 1:10
+df <- data.frame(
+    x = rep(x, 4),
+    y = c(x * 1.2, x * 0.8, x * 1.1, x * 1.05),
+    group = factor(rep(c("Seurat Bootstrapped", "Scanpy Bootstrapped", "Bootstrap Summed Error", "Seurat vs. Scanpy"), each = 10), levels = c("Seurat Bootstrapped", "Scanpy Bootstrapped", "Bootstrap Summed Error", "Seurat vs. Scanpy")),
+    color = rep(c("#D55E00", "#56B4E9", NA, "black"), each = 10),
+    linetype = rep(c("solid", "solid", "dashed", "solid"), each = 10)
+)
+
+# Plot
+custom_legend <- ggplot(df, aes(x, y, group = group, color = group, linetype = group)) +
+    geom_line(linewidth = 0.5) +
+    scale_color_manual(values = c("Seurat Bootstrapped" = "#D55E00", "Scanpy Bootstrapped" = "#56B4E9", "Bootstrap Summed Error" = "black", "Seurat vs. Scanpy" = "black")) +
+    scale_linetype_manual(values = c("Seurat Bootstrapped" = "solid", "Scanpy Bootstrapped" = "solid", "Bootstrap Summed Error" = "solid", "Seurat vs. Scanpy (defaults)" = "dashed")) +
+    theme(
+        text = element_text(family = "Arial"),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 12)
+    ) +
+    guides(color = guide_legend(override.aes = list(linetype = c("solid", "solid", "solid", "dashed"))))
+
+custom_legend
+
+custom_legend_filepath <- glue("{output_path_base}/line_plot_legend.tiff")
+
+ggsave(custom_legend_filepath, plot = custom_legend, dpi = 500, bg = "white")
+```
+

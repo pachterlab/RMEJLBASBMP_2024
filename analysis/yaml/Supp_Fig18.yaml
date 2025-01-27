@@ -1,0 +1,29 @@
+# Input and output path specifications
+# Files to analyze
+bootstrapped_seeds_list: [42, 43, 44, 45, 46]
+show_summed_error: TRUE  # TRUE or FALSE
+
+project_base_path: "/workspace/analysis"
+data_name: "SC3_v3_NextGem_SI_PBMC_10K"
+bootstrapped_data_path: ""  # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}/bootstrapped_stats")
+seurat_version: "5_0_2"
+scanpy_version: "1_9_5"
+matrix_generation: "kb0_28_0"
+conda_env: "analysis_env"
+
+# Specifications for downloading data
+download_data: TRUE
+doi: ""  # For downloading from CaltechDATA (not yet implemented)
+bootstrapped_data_file_link: "https://caltech.box.com/shared/static/5ucvwugxb6t03hig556xf4sjy4ifh7wv.gz"  # For downloading from Box
+data_path_root: ""  # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}")
+data_name_from_download: "bootstrapped_stats"  # str
+
+dpi: 300
+
+
+# frac_list --> DELETED
+# downsampled_seeds_list --> bootstrapped_seeds_list
+# downsampled_data_path --> bootstrapped_data_path
+# type_downsampled --> DELETED
+# margin_correct --> DELETED
+# downsampled_data_file_link --> bootstrapped_data_file_link

@@ -100,3 +100,12 @@ cd ~/Desktop/data/<project_name>
 kb count -i index.idx -g t2g.txt -x 10xv3 -o ~/Desktop/output/<project_name>/kb FASTQ1 FASTQ2 ETC
 cellranger count --id=seed{seed}_frac{int(frac*100)} --transcriptome={transcriptome_path} --fastqs={fastq_directory} --sample={instance.data_name} --localcores=8 --localmem=64
 
+- bootstrap data
+*modify arguments in the file*
+python3 scripts/bootstrapData.py
+*modify arguments in the file*
+python3 scripts/alignBootstrappedData.py
+
+- download and align additional datasets (mouse brain and NSCLC from Supp Figs 19-20)
+*modify arguments in the file*
+python3 scripts/download_and_align_additional_datasets,py

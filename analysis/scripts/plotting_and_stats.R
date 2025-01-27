@@ -558,7 +558,7 @@ scatterplot_naming <- function(group1_name, group2_name) {
 }
 
 
-plot_scatterplot_de_wilcoxon <- function(markers2, metric, outliers_excluded = FALSE, show_legend = FALSE, group1_name = "Seurat", group2_name = "Scanpy", save = FALSE) {
+plot_scatterplot_de_wilcoxon <- function(markers2, metric, outliers_excluded = FALSE, show_legend = FALSE, group1_name = "Seurat", group2_name = "Scanpy", spearman = NULL, save = FALSE) {
     scatterplot_names <- scatterplot_naming(group1_name, group2_name)
 
     p_val_adj_group1 <- scatterplot_names$p_val_adj_group1
@@ -597,6 +597,27 @@ plot_scatterplot_de_wilcoxon <- function(markers2, metric, outliers_excluded = F
             axis.text = element_text(size = rel(axis_numbering_size)), # Increase axis tick labels size
             axis.title = element_text(size = rel(axis_text_size))         # Increase axis text size
         )
+    
+    # show spearman correlation
+    if (!is.null(spearman)) {
+        p <- p +
+            annotate(
+                "text",
+                x = Inf,  # Places the annotation on the far right
+                y = -Inf, # Places the annotation on the bottom
+                label = glue::glue("Spearman Correlation = {sprintf('%.3f', spearman)}"),
+                hjust = 1.04, # Align text to the right
+                vjust = -0.28,  # Align text to the bottom
+                size = 3.5
+            )
+        
+        ymin_inset <- -5
+        ymax_inset <- 145
+        
+    } else {
+        ymin_inset <- -10
+        ymax_inset <- 140
+    }
 
     df_inset <- markers2 %>% filter((log_p_val_adj_1 <= 10) & (log_p_val_adj_2 <= 10))
 
@@ -620,7 +641,7 @@ plot_scatterplot_de_wilcoxon <- function(markers2, metric, outliers_excluded = F
     inset_grob <- ggplotGrob(p_inset)
 
     p <- p +
-        annotation_custom(grob = inset_grob, xmin = 170, xmax = 320, ymin = -10, ymax = 140) # 170, 320   # 320, 470
+        annotation_custom(grob = inset_grob, xmin = 170, xmax = 320, ymin = ymin_inset, ymax = ymax_inset) # 170, 320   # 320, 470   # ymin_inset and ymax_inset adjusted based on whether or not spearman shows
 
     if (save == TRUE || is.character(save)) {
         filepath <- make_save_path(filepath = save, default_filepath = file_paths_default$wilcoxon_scatterplot_file_path)
@@ -1303,9 +1324,13 @@ find_group2_colors <- function(clus_df_gather, group1_name, group2_name) {
     return (group2_colors)
 }
 
-plot_alluvial <- function(clus_df_gather, group1_name = "Seurat", group2_name = "Scanpy", color_boxes = TRUE, color_bands = FALSE, alluvial_alpha = 0.5, match_colors = TRUE, save = FALSE) {
+plot_alluvial <- function(clus_df_gather, group1_name = "Seurat", group2_name = "Scanpy", group1_name_mapping = "Seurat", group2_name_mapping = "Scanpy", color_boxes = TRUE, color_bands = FALSE, alluvial_alpha = 0.5, match_colors = TRUE, save = FALSE, include_labels_in_boxes = FALSE, include_axis_titles = FALSE, show_group_2_box_labels_in_ascending = FALSE) {
     num_levels_group1 <- length(levels(clus_df_gather[[group1_name]]))
     num_levels_group2 <- length(levels(clus_df_gather[[group2_name]]))
+    
+    if (show_group_2_box_labels_in_ascending) {
+        group2_name_mapping <- group2_name
+    }
 
     # Extract colors for each factor, assuming ditto_colors is long enough
     colors_group1 <- ditto_colors[1:num_levels_group1]
@@ -1323,7 +1348,9 @@ plot_alluvial <- function(clus_df_gather, group1_name = "Seurat", group2_name = 
     combined_colors <- c(colors_group1, colors_group2)
     combined_colors_reverse <- c(colors_group1_reverse, colors_group2_reverse)
 
-    p <- ggplot(data = clus_df_gather, aes(axis1 = !!sym(group1_name), axis2 = !!sym(group2_name), y = value))
+    # uncomment to attempt mapping
+    # p <- ggplot(data = clus_df_gather, aes(axis1 = !!sym(group1_name_mapping), axis2 = !!sym(group2_name_mapping), y = value))  # commented out as of Jan 2025
+    p <- ggplot(data = clus_df_gather, aes(axis1 = !!sym(group1_name), axis2 = !!sym(group2_name), y = value))  # uncommented as of Jan 2025
 
     if (color_bands) {
         if (num_levels_group2 > num_levels_group1) {
@@ -1346,6 +1373,17 @@ plot_alluvial <- function(clus_df_gather, group1_name = "Seurat", group2_name = 
     } else {
         p <- p + geom_stratum()
     }
+    
+    if (include_labels_in_boxes) {
+        p <- p + 
+            geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3, color = "black")
+    } 
+    
+    if (include_axis_titles) {
+        p <- p +
+            annotate("text", x = 1, y = max(clus_df_gather$value) + 510, label = group1_name, size = 5, hjust = 0.5) +
+            annotate("text", x = 2, y = max(clus_df_gather$value) + 510, label = group2_name, size = 5, hjust = 0.5)
+    } 
 
     p <- p +
         # geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
@@ -1571,6 +1609,19 @@ calculate_de_stats <- function(markers2, group1_name = "Seurat", group2_name = "
     print(glue("Adjusted p value, fraction <=0.05 in {group2_name} but >0.05 in {group1_name}: {p2_small/nrow(markers2)}"))
     print(glue("Adjusted p value, fraction >0.05 in both groups: {p_both_big/nrow(markers2)}"))
     print(glue("Adjusted p value, fraction that flipped across 0.05 threshold: {fraction_flipped}"))
+    
+    # Add new columns with ranks for p_val_adj_py and p_val_adj_r (for Spearman)
+    markers2_ranked <- markers2 %>%
+        mutate(
+            rank_p_val_adj_group1 = rank(!!sym(p_val_adj_group1), ties.method = "min"),
+            rank_p_val_adj_group2 = rank(!!sym(p_val_adj_group2), ties.method = "min"),
+        )
+    
+    # Compute Spearman correlation between the two rank columns
+    spearman_correlation <- cor(markers2_ranked$rank_p_val_adj_group1, markers2_ranked$rank_p_val_adj_group2, method = "spearman")
+    print(glue("Adjusted p value, Spearman correlation: {spearman_correlation}"))
+    
+    markers2 <- markers2 %>% mutate(spearman = spearman_correlation)
 
     # # FC (exponentiated)
     # FC_difference_magnitude_equation <- abs(markers2$FC_r - markers2$FC_py)
@@ -1946,4 +1997,264 @@ CCC <- function(x, y, ci = "z-transform", conf.level = 0.95, na.rm = FALSE){
         rval <- list(rho.c = rho.c, s.shift = v, l.shift = u, C.b = C.b, blalt = blalt) #, nmissing = nmissing)
     }
     return(rval)
+}
+
+
+
+create_volcano_plots <- function(data, output_base_path, package, dpi = 300) {
+    dir.create(output_base_path, recursive = TRUE, showWarnings = FALSE)
+    
+    if (package == "Seurat") {
+        logfc_col <- "logFC_r"
+        pval_col <- "p_val_adj_r"
+    } else if (package == "Scanpy") {
+        logfc_col <- "logFC_py"
+        pval_col <- "p_val_adj_py"
+    } else{
+        stop("Invalid package specified. Please use 'Seurat' or 'Scanpy'.")
+    }
+    
+    # Dynamically access the specified columns
+    logFC <- sym(logfc_col)
+    pval <- sym(pval_col)
+    
+    # Get unique clusters
+    clusters <- unique(data$cluster)
+    
+    for (clust in clusters) {
+        # Subset data for the current cluster
+        subset_data <- subset(data, cluster == clust)
+        
+        # Cap y-values at 5 for display purposes
+        subset_data <- subset_data %>% mutate(neg_log10_pval = pmin(-log10(!!pval), 5))
+        
+        # Create a new color column
+        subset_data$color <- "gray"  # Default color
+        subset_data$color[subset_data[[logfc_col]] >= 1 & subset_data[[pval_col]] < 0.05] <- "red"
+        subset_data$color[subset_data[[logfc_col]] <= -1 & subset_data[[pval_col]] < 0.05] <- "blue"
+        
+        # Create volcano plot
+        p <- ggplot(subset_data, aes(x = !!logFC, y = neg_log10_pval)) +
+            geom_point(aes(color = color), alpha = 0.6) +
+            scale_color_identity() +  # Use color directly from the data
+            geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "black") +  # Dashed lines for logFC thresholds
+            geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  # Dashed line for p-value threshold
+            scale_x_continuous(
+                limits = c(-10, 10),
+                breaks = seq(-10, 10, 2),  # Major ticks every 2
+                minor_breaks = seq(-10, 10, 1)  # Minor ticks every 1
+            ) +
+            scale_y_continuous(
+                limits = c(0, 5),
+                breaks = seq(0, 5, 1),
+                labels = c(0, 1, 2, 3, 4, "≤5")  # Custom label for the top value
+            ) +
+            labs(
+                title = glue("{package} Cluster {clust}"),
+                x = expression(Log[2] ~ "Fold Change"),
+                y = expression(-Log[10] ~ "Adjusted P-Value")
+            ) +
+            theme_minimal(base_size = 14) +
+            theme(
+                plot.background = element_rect(fill = "white", color = NA),  # White background
+                plot.title = element_text(hjust = 0.5),  # Center title
+                panel.grid.minor = element_line(color = "lightgray", linetype = "dotted")  # Minor grid lines
+            )
+        
+        # Save plot as TIFF
+        output_file <- file.path(output_base_path, paste0("volcano_", package, "_cluster_", clust, ".tiff"))
+        ggsave(filename = output_file, plot = p, dpi = dpi, width = 6, height = 4, units = "in")
+    }
+    
+    message("Volcano plots saved to: ", output_base_path)
+    
+    # Create a stand-alone legend
+    create_legend <- function() {
+        dummy_data <- data.frame(
+            x = c(1, -1, 0),
+            y = c(1, 1, 1),
+            significance = factor(
+                c("Up", 
+                  "Down", 
+                  "Normal"),
+                levels = c("Up", 
+                           "Down", 
+                           "Normal"),
+            )
+        )
+        
+        legend_plot <- ggplot(dummy_data, aes(x = x, y = y, color = significance)) +
+            geom_point(size = 4) +
+            scale_color_manual(
+                values = c(
+                    "Up" = "red",
+                    "Down" = "blue",
+                    "Normal" = "gray"
+                )
+            ) +
+            labs(color = "Significance") +
+            theme_void() +  # Remove all axes and backgrounds
+            theme(
+                legend.position = "right",
+                legend.title = element_text(size = 14, face = "bold"),
+                legend.text = element_text(size = 12)
+            )
+        
+        # Extract and save the legend
+        legend <- cowplot::get_legend(legend_plot)
+        legend_file <- file.path(output_base_path, "volcano_legend.tiff")
+        ggsave(legend_file, plot = gridExtra::grid.arrange(legend), dpi = dpi, width = 3, height = 2, units = "in")
+        message("Legend saved to: ", legend_file)
+    }
+    
+    # Call the function to create and save the legend
+    create_legend()
+}
+
+
+run_gget_enrichr <- function(genes_list, databases, filename_base, output_base_path_biological_output, ensembl=FALSE, custom_background_list=NULL, save_kegg=FALSE) {
+    if (class(genes_list) != "list") {
+        genes_list <- as.list(genes_list)
+    }
+    
+    if (is.null(custom_background_list)) {
+        background <- TRUE
+        ensembl_bkg <- FALSE
+    } else {
+        background <- FALSE
+        ensembl_bkg <- ensembl
+        if (class(custom_background_list) != "list") {
+            custom_background_list <- as.list(unique(custom_background_list))
+        }
+    }
+    
+    for (database in databases) {
+        if (save_kegg == TRUE) {
+            if (database == "pathway" || grepl("^KEGG", database)) {
+                kegg_out_path <- file.path(output_base_path_biological_output, paste0("kegg_", database, ".png"))
+            } else {
+                kegg_out_path <- NULL
+            }
+        } else {
+            kegg_out_path <- NULL
+        }
+        
+        gget$enrichr(genes_list, database=database, species='human', background=background, background_list=custom_background_list, ensembl=ensembl, ensembl_bkg=ensembl_bkg, plot=TRUE, save=TRUE, kegg_out=kegg_out_path)
+        # Define paths
+        png_destination_path <- file.path(output_base_path_biological_output, paste0(filename_base, "_", database, ".png"))
+        csv_destination_path <- file.path(output_base_path_biological_output, paste0(filename_base, "_", database, ".csv"))
+        dir.create(output_base_path_biological_output, recursive = TRUE, showWarnings = FALSE)
+        
+        # Define source files
+        png_source_path <- "./gget_enrichr_results.png"
+        csv_source_path <- "./gget_enrichr_results.csv"
+        
+        # Move the .png file if it exists
+        if (file.exists(png_source_path)) {
+            file.rename(png_source_path, png_destination_path)
+            print(glue("{png_source_path} moved to {png_destination_path}"))
+        } else {
+            print(sprintf("File not found: %s", png_source_path))
+        }
+        
+        # Move the .csv file if it exists
+        if (file.exists(csv_source_path)) {
+            file.rename(csv_source_path, csv_destination_path)
+            print(glue("{csv_source_path} moved to {csv_destination_path}"))
+        } else {
+            print(sprintf("File not found: %s", csv_source_path))
+        }
+    }
+}
+
+
+make_volcano_go_plots <- function(markers2, databases = NULL, ensembl=FALSE, custom_background_list=NULL, save_kegg=FALSE) {
+    dir.create(output_base_path, recursive = TRUE, showWarnings = FALSE)
+    
+    gene_name_column <- if (ensembl) markers2$gene else markers2$gene_symbol
+    
+    # Get unique clusters
+    clusters <- unique(markers2$cluster)
+    
+    # Loop over each cluster
+    for (clust in clusters) {
+        # Subset data for the current cluster
+        subset_data <- markers2[markers2$cluster == clust, ]
+        
+        # Get gene sets for Seurat and Scanpy thresholds
+        genes_seurat <- unlist(list(unique(gene_name_column[abs(subset_data$logFC_r) >= 1 & subset_data$p_val_adj_r < 0.05])))
+        genes_seurat <- unique(genes_seurat)
+        genes_seurat <- genes_seurat[!is.null(genes_seurat) & !is.na(genes_seurat)]
+        
+        genes_scanpy <- unlist(list(unique(gene_name_column[abs(subset_data$logFC_py) >= 1 & subset_data$p_val_adj_py < 0.05])))
+        genes_scanpy <- unique(genes_scanpy)
+        genes_scanpy <- genes_scanpy[!is.null(genes_scanpy) & !is.na(genes_scanpy)]
+        
+        enrichr_filename_base = glue("enrichr_seurat_cluster{clust}")
+        run_gget_enrichr(genes_seurat, databases=databases, filename_base=enrichr_filename_base, output_base_path_biological_output=output_base_path_biological_output, custom_background_list=custom_background_list, save_kegg=save_kegg, ensembl=ensembl)  # custom_background_list=background_list
+        
+        enrichr_filename_base = glue("enrichr_scanpy_cluster{clust}")
+        run_gget_enrichr(genes_scanpy, databases=databases, filename_base=enrichr_filename_base, output_base_path_biological_output=output_base_path_biological_output, custom_background_list=custom_background_list, save_kegg=save_kegg, ensembl=ensembl)  # custom_background_list=background_list
+        
+        print(glue("Done with cluster {clust}"))
+    }
+}
+
+# Function to calculate Jaccard index
+calculate_jaccard <- function(set1, set2) {
+    intersection_size <- length(intersect(set1, set2))
+    union_size <- length(union(set1, set2))
+    if (union_size == 0) return(0)  # Avoid division by zero
+    return(intersection_size / union_size)
+}
+
+make_volcano_jaccards_and_upsets <- function(markers2, make_upset_plots = TRUE) {
+    dir.create(output_base_path, recursive = TRUE, showWarnings = FALSE)
+    
+    # Initialize variables to store global sets
+    global_genes_seurat <- c()
+    global_genes_scanpy <- c()
+    
+    # Get unique clusters
+    clusters <- unique(markers2$cluster)
+    
+    # Loop over each cluster
+    jaccard_indices <- list()  # Store per-cluster Jaccard indices
+    for (clust in clusters) {
+        # Subset data for the current cluster
+        subset_data <- markers2[markers2$cluster == clust, ]
+        
+        # Get gene sets for Seurat and Scanpy thresholds
+        genes_seurat <- subset_data$gene[abs(subset_data$logFC_r) >= 1 & subset_data$p_val_adj_r < 0.05]
+        genes_scanpy <- subset_data$gene[abs(subset_data$logFC_py) >= 1 & subset_data$p_val_adj_py < 0.05]
+        
+        # Add to global sets
+        global_genes_seurat <- union(global_genes_seurat, genes_seurat)
+        global_genes_scanpy <- union(global_genes_scanpy, genes_scanpy)
+        
+        # Calculate Jaccard index for the current cluster
+        jaccard_index <- calculate_jaccard(genes_seurat, genes_scanpy)
+        jaccard_indices[[as.character(clust)]] <- jaccard_index
+        
+        data <- list(Seurat = genes_seurat, Scanpy = genes_scanpy)
+        
+        if (make_upset_plots) {
+            p <- upset_plot_general(data, group1_name = "Seurat", group2_name = "Scanpy", comparison = "Gene", as_ggplot = FALSE, save = glue("{output_base_path_biological_output}/upset_volcano_clust{clust}.tiff"))  #!!!! uncomment   
+        }
+    }
+    
+    # Calculate the global Jaccard index across all clusters
+    global_jaccard_index <- calculate_jaccard(global_genes_seurat, global_genes_scanpy)
+    
+    # Prepare the output file path
+    output_file <- glue::glue("{output_base_path_biological_output}/jaccard_indices.txt")
+    
+    # Write results to the file
+    output_lines <- c(
+        "Jaccard Index for each cluster:",
+        paste(names(jaccard_indices), jaccard_indices, sep = ": "),
+        "",
+        glue::glue("Global Jaccard Index across all clusters: {global_jaccard_index}")
+    )
+    writeLines(output_lines, con = output_file)
 }

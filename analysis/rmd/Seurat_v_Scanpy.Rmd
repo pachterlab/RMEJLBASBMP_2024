@@ -6,7 +6,7 @@ date: "2024-01-01"
 
 Select yaml file
 ```{r}
-yaml_file <- "Supp_Fig5"  # Fig1, Supp_Fig2, Supp_Fig3, Supp_Fig4, Supp_Fig5
+yaml_file <- "Supp_Fig3"  # Fig1, Supp_Fig2, Supp_Fig3, Supp_Fig4, Supp_Fig5, Supp_Fig19, Supp_Fig19_DE, Supp_Fig20, Supp_Fig20_DE
 ```
 
 Load contents of yaml file into global R environment
@@ -293,6 +293,12 @@ if (analysis_methods == "default" || analysis_methods == "seurat_like") {
 } else {
     paste(analysis_methods, "is not a valid input for analysis_methods. Please choose from 'default', 'seurat_like', or 'scanpy_like'.")
 }
+
+if (yaml_file == "Fig1") {
+    scanpy_normalization_target_sum <- NULL
+} else {
+    scanpy_normalization_target_sum <- 1e4
+}
 ```
 
 View reticulate python environment
@@ -554,6 +560,24 @@ overlapping_inds <- intersect(seu_inds, scan_inds)
 overlapping_genes <- intersect(seu_genes, scan_genes)
 ```
 
+
+JUST FOR SUPPFIG20, where Scanpy strangely has 1 more cell than Seurat - make sure the cell lists are the same (intersection)
+```{r}
+if (yaml_file == "Supp_Fig20" | yaml_file == "Supp_Fig20_DE") {
+    seu <- subset(seu, cells = overlapping_inds)
+    py$adata <- py$adata[py$adata$obs_names$isin(overlapping_inds), ]
+    
+    # repeat the code above, minus the overlapping_inds
+    seu_inds <- colnames(seu)
+    seu_genes <- rownames(seu)
+    
+    scan_inds <- as.vector(py$adata$obs_names$values)
+    scan_genes <- as.vector(py$adata$var_names$values)
+    overlapping_genes <- intersect(seu_genes, scan_genes)
+}
+```
+
+
 If data_input == "seurat": Apply Cells and Genes from Seurat to Scanpy
 ```{python}
 if data_input == "seurat":
@@ -622,7 +646,7 @@ seu <- NormalizeData(seu, verbose = FALSE)
 
 ```{python}
 if r.scanpy_hvg_flavor != "seurat_v3":
-    sc.pp.normalize_total(adata, target_sum=1e4)
+    sc.pp.normalize_total(adata, target_sum=scanpy_normalization_target_sum)
 ```
 
 ```{python}
@@ -674,7 +698,7 @@ upset_hvg <- make_upset_seurat_vs_scanpy(seu, py$adata, comparison = "HVG", save
 
 ```{python}
 if r.scanpy_hvg_flavor == "seurat_v3":
-    sc.pp.normalize_total(adata, target_sum=1e4)
+    sc.pp.normalize_total(adata, target_sum=scanpy_normalization_target_sum)
 ```
 
 ```{python}
@@ -943,6 +967,9 @@ seu_snn_b <- snn_graph_seu > 0
 sc_nn_b <- py$snn_graph_scan > 0
 
 if (!identical(seu_inds, scan_inds)) {
+    rownames(sc_nn_b) <- as.vector(py$adata$obs_names$values)  # NEW AS OF 2025 - can be moved outside this conditional (to match scan vs scan notebook), but since this is a new edition, I am keeping it in here to be safe
+    colnames(sc_nn_b) <- as.vector(py$adata$obs_names$values)  # NEW AS OF 2025 - can be moved outside this conditional (to match scan vs scan notebook), but since this is a new edition, I am keeping it in here to be safe
+
     seu_snn_b <- seu_snn_b[overlapping_inds, overlapping_inds]
     sc_nn_b <- sc_nn_b[overlapping_inds, overlapping_inds]
 }
@@ -1075,7 +1102,7 @@ new_cluster_pca <- DimPlot(seu, label = TRUE, group.by = "seurat_clusters", labe
 new_cluster_pca
 
 if (file_paths$pca_cluster_filepath_seu != FALSE) {
-    ggsave(file_paths$pca_cluster_filepath_seu, plot = new_cluster_pca, dpi = dpi_color)
+    ggsave(file_paths$pca_cluster_filepath_seu, plot = new_cluster_pca, dpi = dpi)
 }
 ```
 
@@ -1570,7 +1597,7 @@ markers2$p_val_adj_r[markers2$p_val_adj_r == 0] <- .Machine$double.xmin
 markers2$p_val_adj_py[markers2$p_val_adj_py == 0] <- .Machine$double.xmin
 
 seurat_vs_scanpy_logFC_scatterplot <- plot_scatterplot_de_logfc(markers2, ccc = markers2$CCC[1], save = file_paths$logFC_scatterplot_file_path, outliers_excluded = FALSE)
-seurat_vs_scanpy_pvaladj_scatterplot <- plot_scatterplot_de_wilcoxon(markers2, save = file_paths$wilcoxon_scatterplot_file_path, outliers_excluded = FALSE)
+seurat_vs_scanpy_pvaladj_scatterplot <- plot_scatterplot_de_wilcoxon(markers2, save = file_paths$wilcoxon_scatterplot_file_path, outliers_excluded = FALSE)  # if I want to add spearman here, simply add the following argument: spearman = markers2$spearman[1]
 
 seurat_vs_scanpy_logFC_scatterplot_with_legend <- plot_scatterplot_de_logfc(markers2, ccc = markers2$CCC[1], save = file_paths$logFC_scatterplot_file_path_with_legend, outliers_excluded = FALSE, show_legend = TRUE)
 
@@ -1594,5 +1621,86 @@ if (save_data) {
 ```
 
 ```{r}
+if (yaml_file != "Supp_Fig3") {
+    sessionInfo()
+    stop("Additional biological analysis is only included for the conditions in Supp_Fig3 in the manuscript.")
+}
+```
+
+```{python}
+try:
+    import gget
+except ImportError:
+    import subprocess
+    print("gget is not installed. Installing it now...")
+    subprocess.check_call(["pip", "install", "gget==0.29.0"])
+    print("gget has been installed successfully!")
+```
+
+```{r}
+gget <- import("gget")
+output_base_path_biological_output <- glue::glue("{output_base_path}/additional_biological_output")
+dir.create(output_base_path_biological_output, recursive = TRUE, showWarnings = FALSE)
+ensembl <- FALSE  # for the PBMC 10k data, this requires converting to gene symbol before the fact, which is important because gget enrichr might throw an error for large ensembl ID lists
+# markers2 <- readRDS(output_data_file_paths$markers2)  # for loading in the object after the fact
+# markers2 <- markers2 %>% sample_n(200)  # for debugging with small data
+```
+
+```{r}
+# Call the function with markers2, output base path, and custom dpi
+for (package in c("Seurat", "Scanpy")) {
+    create_volcano_plots(
+      data = markers2,
+      package = package,
+      output_base_path = output_base_path_biological_output,
+      dpi = dpi
+    )
+}
+```
+
+```{r}
+make_volcano_jaccards_and_upsets(markers2, make_upset_plots=TRUE)
+```
+
+Map from Ensembl --> gene symbols (gget enrichr only works with gene symbols) - write this file if it doesn't already exist
+```{r}
+unique_genes_text_file_path <- glue("{output_base_path_biological_output}/unique_genes.txt")
+id_to_symbol_csv_path <- glue("{output_base_path_biological_output}/id_to_symbol.csv")
+    
+if (!ensembl && !file.exists(id_to_symbol_csv_path)) {
+    if (!file.exists(unique_genes_text_file_path)) {
+        unique_genes <- unlist(list(unique(markers2$gene)))  # make a list of unique Ensembl gene IDs from markers2
+        writeLines(unique_genes, unique_genes_text_file_path)
+    }
+    system(glue("python3 ../scripts/ensembl_to_symbol.py -i {unique_genes_text_file_path} -o {id_to_symbol_csv_path}"))
+}
+```
+
+make a gene symbol column in markers2
+```{r}
+if (!ensembl) {
+    # Load the CSV
+    gene_dict_df <- read.csv(id_to_symbol_csv_path, stringsAsFactors = FALSE)
+    
+    # Convert to a named vector (dictionary)
+    gene_dict <- setNames(gene_dict_df$Gene_Symbol, gene_dict_df$Ensembl_ID)
+    
+    markers2 <- markers2 %>%
+      dplyr::mutate(gene_symbol = purrr::map_chr(gene, ~ gene_dict[[.x]] %||% NA_character_))
+}
+```
+
+run gget enrichr
+```{r}
+source(glue("{project_base_path}/scripts/plotting_and_stats.R"))
+
+databases <- c("pathway")  # c("pathway", "ontology", "celltypes")
+# gene_name_column <- if (ensembl) markers2$gene else markers2$gene_symbol
+# background_list <- as.list(unique(gene_name_column))
+make_volcano_go_plots(markers2, databases=databases, custom_background_list=NULL, ensembl=ensembl, save_kegg=FALSE)  # custom_background_list=background_list
+```
+
+```{r}
 sessionInfo()
 ```
+

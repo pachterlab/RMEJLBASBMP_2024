@@ -12,7 +12,7 @@ params:
 
 Select yaml file
 ```{r}
-yaml_file <- "Supp_Scanpy_version1_4"  # Supp_Fig8, Supp_Fig8_DE, Supp_Fig10, Supp_Fig16_scan, Supp_Scanpy_version1_4
+yaml_file <- "Supp_Stats_Bootstrap_Scanpy"  # Supp_Fig8, Supp_Fig8_DE, Supp_Fig10, Supp_Fig15_scan, Supp_Scanpy_version1_4, Supp_Stats_Bootstrap_Scanpy
 ```
 
 Load contents of yaml file into global R environment
@@ -1680,7 +1680,7 @@ pvaladj_scatterplot
 
 Save markers df
 ```{r}
-subset_markers2 <- markers2[, c("gene", "cluster", glue("avg_log2FC.{scan1_name}"), glue("avg_log2FC.{scan2_name}"), glue("p_val_adj.{scan1_name}"), glue("p_val_adj.{scan1_name}"), "logFC_difference_magnitude", "logFC_difference_signed", "pvaladj_difference_magnitude", "pvaladj_difference_signed")]
+subset_markers2 <- markers2[, c("gene", "cluster", glue("avg_log2FC.{scan1_name}"), glue("avg_log2FC.{scan2_name}"), glue("p_val_adj.{scan1_name}"), glue("p_val_adj.{scan2_name}"), "logFC_difference_magnitude", "logFC_difference_signed", "pvaladj_difference_magnitude", "pvaladj_difference_signed")]
 
 if (save_data) {
     saveRDS(result1, file = output_data_file_paths$markers_scan1)
