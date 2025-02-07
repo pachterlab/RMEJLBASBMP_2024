@@ -6,7 +6,7 @@ date: "2024-01-01"
 
 Select yaml file
 ```{r}
-yaml_file <- "Supp_Fig3"  # Fig1, Supp_Fig2, Supp_Fig3, Supp_Fig4, Supp_Fig5, Supp_Fig19, Supp_Fig19_DE, Supp_Fig20, Supp_Fig20_DE
+yaml_file <- "Supp_Fig3"  # Fig1, Supp_Fig2, Supp_Fig3, Supp_Fig4, Supp_Fig5, Supp_Fig18, Supp_Fig18_DE, Supp_Fig19, Supp_Fig19_DE
 ```
 
 Load contents of yaml file into global R environment
@@ -1623,7 +1623,7 @@ if (save_data) {
 ```{r}
 if (yaml_file != "Supp_Fig3") {
     sessionInfo()
-    stop("Additional biological analysis is only included for the conditions in Supp_Fig3 in the manuscript.")
+    stop("Additional biological analysis is only conducted on the conditions in Supp_Fig3 in the manuscript. It requires aligned clusters, so only the conditions from Supp_Fig3, Supp_Fig4, or Supp_Fig5 are suitable.")
 }
 ```
 

@@ -1,6 +1,6 @@
 # Function argument and input settings
-data_input: "seu1" # str["default", "seu1", "seu2"]
-seu2_read_downsample_seed: 46 # random seqtk seed for downsampling reads - 0 for no downsampling, integer >1 for downsampled seed
+data_input: "default" # str["default", "seu1", "seu2"]
+seu2_read_downsample_seed: 42 # random seqtk seed for downsampling reads - 0 for no downsampling, integer >1 for downsampled seed
 output_base_path: "/workspace/analysis/output/SC3_v3_NextGem_SI_PBMC_10K/seuratv5_0_2/input_seu1/kb0_28_0/cell_fraction_1_0/read_fraction_1_0_seed46" # "" for default
 
 
