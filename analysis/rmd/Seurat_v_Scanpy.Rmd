@@ -7,6 +7,7 @@ date: "2024-01-01"
 Select yaml file
 ```{r}
 yaml_file <- "Fig1"  # Fig1, Supp_Fig2, Supp_Fig3, Supp_Fig4, Supp_Fig5, Supp_Fig18, Supp_Fig18_DE, Supp_Fig19, Supp_Fig19_DE
+do_celltyping <- TRUE
 ```
 
 Load contents of yaml file into global R environment
@@ -669,8 +670,6 @@ if r.scanpy_hvg_flavor != "seurat_v3":
 ```{python}
 if r.scanpy_hvg_flavor != "seurat_v3":
     sc.pp.log1p(adata)
-
-adata.raw = adata
 ```
 
 Check equivalency of normalization methods (assuming identical input)
@@ -723,6 +722,8 @@ if r.scanpy_hvg_flavor == "seurat_v3":
 ```{python}
 if r.scanpy_hvg_flavor == "seurat_v3":
     sc.pp.log1p(adata)
+
+adata.raw = adata
 ```
 
 If data_input == "scanpy": Apply HVGs from Scanpy to Seurat
@@ -1538,6 +1539,160 @@ markers_euler_genes_only
 upset_marker_gene_only <- make_upset_seurat_vs_scanpy(vectorized_seu_filtered_markers, vectorized_scan_filtered_markers, comparison = "Marker Gene", save = file_paths$upset_markers_genes_only)
 ```
 
+Run CellTypist
+Celltypist on Scanpy
+```{python}
+if r.do_celltyping:
+    import celltypist
+    from scipy.io import mmread
+    from scipy.sparse import csr_matrix
+    celltypist.models.download_models(force_update = False)
+    
+    # ensure gene symbols are index
+    adata_scan_celltypist.var["gene_ids"] = adata_scan_celltypist.var.index
+    adata_scan_celltypist.var = adata_scan_celltypist.var.set_index("gene_symbols")
+    adata_scan_celltypist.var_names = adata_scan_celltypist.var.index
+    
+    # log1p-normalize with target sum=1e4
+    sc.pp.normalize_total(adata_scan_celltypist, target_sum=1e4)
+    sc.pp.log1p(adata_scan_celltypist)
+    
+    # # use my own neighborhood graph
+    if not all(adata_scan_celltypist.obs_names == adata_seu_celltypist.obs_names):
+        adata_scan_celltypist = adata_scan_celltypist[adata_seu_celltypist.obs_names, :].copy()
+        adata_scan_celltypist.obsp["connectivities"] = adata.obsp["connectivities"]
+        adata_scan_celltypist.obsp["distances"] = adata.obsp["distances"]
+        adata_scan_celltypist.uns["neighbors"] = adata.uns["neighbors"]
+    
+    # sc.pp.highly_variable_genes(adata_scan_celltypist)
+    # adata_scan_celltypist.layers["scaled"] = adata_scan_celltypist.X.toarray()
+    # sc.pp.regress_out(adata_scan_celltypist, ["total_counts", "pct_counts_mt"], layer="scaled")
+    # sc.pp.scale(adata_scan_celltypist, max_value=10, layer="scaled")
+    # sc.pp.pca(adata_scan_celltypist, layer="scaled", svd_solver="arpack")
+    # sc.pp.neighbors(adata_scan_celltypist, n_neighbors=10, n_pcs=40)
+    
+    # run model
+    predictions = celltypist.annotate(adata_scan_celltypist, model=model_pkl, majority_voting=True)
+    pred_labels = predictions.predicted_labels[['majority_voting']]
+    pred_labels = pred_labels.reindex(adata_scan_celltypist.obs_names)  # reorder to match adata_real.obs index
+    adata_scan_celltypist.obs['celltype'] = pred_labels['majority_voting'].values
+    
+    # adata_scan_celltypist.write("adata_scan_celltypist.h5ad)
+```
+
+convert R into anndata for running celltypist
+```{r}
+if (do_celltyping) {
+    # norm_mat <- seu[["RNA"]]@layers$data   # log-normalized counts (dgCMatrix)
+    norm_mat <- GetAssayData(seu, assay = "RNA", layer = "data")  # slot = "data"
+    
+    # write matrix
+    Matrix::writeMM(norm_mat, file = "norm_counts.mtx")
+    
+    # write barcodes and genes
+    write.table(colnames(norm_mat), "barcodes.tsv", quote = FALSE, col.names = FALSE, row.names = FALSE)
+    
+    # write.table(rownames(norm_mat), "genes.tsv", quote = FALSE, col.names = FALSE, row.names = FALSE)
+    write.table(seu[["RNA"]]@meta.data$gene_symbol, "genes.tsv", quote = FALSE, col.names = FALSE, row.names = FALSE)
+    
+    # Extract graphs
+    snn <- seu@graphs$RNA_snn  # Shared nearest neighbor graph
+    knn <- seu@graphs$RNA_nn   # KNN distance/adjacency graph
+    
+    # # Force dgCMatrix (required by writeMM)
+    # snn <- as(snn, "dgCMatrix")
+    # knn <- as(knn, "dgCMatrix")
+    
+    # Ensure symmetry for SNN (Scanpy expects symmetric connectivity matrix)
+    snn_sym <- pmax(snn, t(snn))
+    
+    # -------- Normalize SNN rows (Scanpy-style row-normalized connectivities) --------
+    row_sums <- Matrix::rowSums(snn_sym)
+    row_sums[row_sums == 0] <- 1
+    snn_norm <- snn_sym / row_sums
+    
+    # Convert to CSR using scipy.sparse
+    Matrix::writeMM(snn_norm, "seu_connectivities.mtx")
+    Matrix::writeMM(knn,      "seu_distances.mtx")
+}
+```
+
+Celltypist on Seurat
+```{python}
+if r.do_celltyping:
+    adata_seu_celltypist = sc.read_mtx("norm_counts.mtx").T
+    adata_seu_celltypist.var_names = [x.strip() for x in open("genes.tsv")]
+    adata_seu_celltypist.obs_names = [x.strip() for x in open("barcodes.tsv")]
+    
+    # ---- Load connectivities + distances exported from R ----
+    snn = mmread("seu_connectivities.mtx")
+    knn = mmread("seu_distances.mtx")
+    
+    # Convert to CSR (Scanpy format)
+    adata_seu_celltypist.obsp["connectivities"] = csr_matrix(snn)
+    adata_seu_celltypist.obsp["distances"]      = csr_matrix(knn)
+    
+    # Register Scanpy neighbor metadata (required for UMAP/leiden to work)
+    adata_seu_celltypist.uns["neighbors"] = {
+        "connectivities_key": "connectivities",
+        "distances_key": "distances",
+        "params": {
+            "method": "seurat",
+            "n_neighbors": r.seu_n_neighbors,
+            "n_pcs": r.seu_num_pcs
+        }
+    }
+    
+    predictions_seu = celltypist.annotate(adata_seu_celltypist, model=model_pkl, majority_voting=True)
+    pred_labels_seu = predictions_seu.predicted_labels[['majority_voting']]
+    pred_labels_seu = pred_labels_seu.reindex(adata_seu_celltypist.obs_names)  # reorder to match adata_real.obs index
+    adata_seu_celltypist.obs['celltype'] = pred_labels_seu['majority_voting'].values
+    
+    # adata_seu_celltypist.write("adata_seu_celltypist.h5ad)
+    os.remove("norm_counts.mtx")
+    os.remove("genes.tsv")
+    os.remove("barcodes.tsv")
+    os.remove("seu_connectivities.mtx")
+    os.remove("seu_distances.mtx")
+```
+
+Plot it
+```{python}
+if r.do_celltyping:
+    # adata_scan_celltypist = sc.read_h5ad("adata_scan_celltypist.h5ad")
+    # adata_seu_celltypist = sc.read_h5ad("adata_seu_celltypist.h5ad")
+    
+    # intersection of shared barcodes
+    shared = adata_scan_celltypist.obs_names.intersection(adata_seu_celltypist.obs_names)
+    
+    # extract aligned vectors
+    scan_celltypes = adata_scan_celltypist.obs.loc[shared, "celltype"]
+    seu_celltypes  = adata_seu_celltypist.obs.loc[shared, "celltype"]
+    
+    celltype_df = pd.concat(
+        [
+            seu_celltypes.rename("seu_celltype"),
+            scan_celltypes.rename("scan_celltype")
+        ],
+        axis=1
+    )
+    
+    # celltype_df.to_csv("celltypes.csv")
+```
+
+```{r}
+if (do_celltyping) {
+    # df <- read.csv("celltypes.csv", header = TRUE, stringsAsFactors = FALSE)
+    df <- py$celltype_df
+    
+    print(mclust::adjustedRandIndex(df$seu_celltype, df$scan_celltype))  # ARI
+    print(mean(df$seu_celltype == df$scan_celltype))  # fraction of cells that agree
+    
+    wompwomp::plot_alluvial(df = df, graphing_columns = c("seu_celltype", "scan_celltype"), sorting_algorithm = "none", coloring_algorithm = "left", text_size = 15, axis_text_size = 25, axis_text_vjust = 0, min_text = 1e-12, output_plot_path = glue::glue("{output_base_path}/plots/celltype_alluvial.pdf"))
+}
+```
+Done with CellTypist
+
 Stop DE analysis if data input does not align (as without aligned cluster information, DE analysis is not meaningful)
 ```{r}
 if (data_input == "default" || !identical(seu_inds, scan_inds)) {
@@ -1709,99 +1864,11 @@ if (!ensembl) {
 
 run gget enrichr
 ```{r}
-source(glue("{project_base_path}/scripts/plotting_and_stats.R"))
-
 databases <- c("pathway")  # c("pathway", "ontology", "celltypes")
 # gene_name_column <- if (ensembl) markers2$gene else markers2$gene_symbol
 # background_list <- as.list(unique(gene_name_column))
 make_volcano_go_plots(markers2, databases=databases, custom_background_list=NULL, ensembl=ensembl, save_kegg=FALSE)  # custom_background_list=background_list
 ```
-
-Run CellTypist
-```{python}
-import celltypist
-
-# ensure gene symbols are index
-adata_scan_celltypist.var["gene_ids"] = adata_scan_celltypist.var.index
-adata_scan_celltypist.var = adata_scan_celltypist.var.set_index("gene_symbols")
-adata_scan_celltypist.var_names = adata_scan_celltypist.var.index
-
-# log1p-normalize with target sum=1e4
-sc.pp.normalize_total(adata_scan_celltypist, target_sum=1e4)
-sc.pp.log1p(adata_scan_celltypist)
-
-# load model
-model_pkl = "Immune_All_High.pkl"
-celltypist.models.download_models(force_update = False)
-
-# run model
-predictions = celltypist.annotate(adata_scan_celltypist, model=model_pkl, majority_voting=True)
-pred_labels = predictions.predicted_labels[['majority_voting']]
-pred_labels = pred_labels.reindex(adata_scan_celltypist.obs_names)  # reorder to match adata_real.obs index
-adata_scan_celltypist.obs['celltype'] = pred_labels['majority_voting'].values
-```
-
-convert R into anndata for running celltypist
-```{r}
-# norm_mat <- seu_celltypist[["RNA"]]@layers$data   # log-normalized counts (dgCMatrix)
-norm_mat <- GetAssayData(seu_celltypist, assay = "RNA", layer = "data")  # slot = "data"
-
-# write matrix
-Matrix::writeMM(norm_mat, file = "norm_counts.mtx")
-
-# write barcodes and genes
-write.table(colnames(norm_mat), "barcodes.tsv", quote = FALSE, col.names = FALSE, row.names = FALSE)
-
-# write.table(rownames(norm_mat), "genes.tsv", quote = FALSE, col.names = FALSE, row.names = FALSE)
-write.table(seu_celltypist[["RNA"]]@meta.data$gene_symbol, "genes.tsv", quote = FALSE, col.names = FALSE, row.names = FALSE)
-```
-
-```{python}
-adata_seu_celltypist = sc.read_mtx("norm_counts.mtx").T
-adata_seu_celltypist.var_names = [x.strip() for x in open("genes.tsv")]
-adata_seu_celltypist.obs_names = [x.strip() for x in open("barcodes.tsv")]
-
-import celltypist
-model_pkl = "Immune_All_High.pkl"
-celltypist.models.download_models(force_update = False)
-predictions_seu = celltypist.annotate(adata_seu_celltypist, model=model_pkl, majority_voting=True)
-pred_labels_seu = predictions_seu.predicted_labels[['majority_voting']]
-pred_labels_seu = pred_labels_seu.reindex(adata_seu_celltypist.obs_names)  # reorder to match adata_real.obs index
-adata_seu_celltypist.obs['celltype'] = pred_labels_seu['majority_voting'].values
-
-# adata_seu_celltypist.write("adata_seu_celltypist.h5ad)
-# os.remove("norm_counts.mtx")
-# os.remove("genes.tsv")
-# os.remove("barcodes.tsv")
-```
-
-```{python}
-# import anndata as ad
-# adata_seu_celltypist = ad.read_h5ad("adata_seu_celltypist.h5ad")
-
-# intersection of shared barcodes
-shared = adata_scan_celltypist.obs_names.intersection(adata_seu_celltypist.obs_names)
-
-# extract aligned vectors
-scan_celltypes = adata_scan_celltypist.obs.loc[shared, "celltype"]
-seu_celltypes  = adata_seu_celltypist.obs.loc[shared, "celltype"]
-
-celltype_df = pd.concat(
-    [
-        seu_celltypes.rename("seu_celltype"),
-        scan_celltypes.rename("scan_celltype")
-    ],
-    axis=1
-)
-```
-
-```{r}
-celltype_ari_value <- mclust::adjustedRandIndex(seu_celltypes, scan_celltypes)
-print(celltype_ari_value)
-
-wompwomp::plot_alluvial(df = py$celltype_df, graphing_columns = c("seu_celltype", "scan_celltype"))
-```
-
 
 ```{r}
 sessionInfo()

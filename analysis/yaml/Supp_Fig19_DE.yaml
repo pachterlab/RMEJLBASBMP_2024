@@ -65,6 +65,7 @@ umap_leiden_seed_seu: 42
 umap_leiden_seed_scan: 42
 umap_umap_seed_seu: 42
 umap_umap_seed_scan: 42
+model_pkl: "Human_Lung_Atlas"
 
 dpi: 300
 
