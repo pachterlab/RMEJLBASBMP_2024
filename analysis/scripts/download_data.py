@@ -4,7 +4,15 @@ import requests
 import json
 from tqdm import tqdm
 
-def download_file(doi, filename, data_path_root):
+def download_file(doi, filename, data_path_root, overwrite = False):
+    full_path = os.path.join(data_path_root, filename)
+    if os.path.exists(full_path) and not overwrite:
+        # raise FileExistsError(f"File {full_path} already exists.")
+        print("File exists. Skipping download.")
+        return full_path
+
+    if doi.startswith('https://doi.org/'):
+        doi = doi.replace('https://doi.org/', '')
     url = 'https://api.datacite.org/dois/'+doi+'/media'
     r = requests.get(url).json()
     found = False
@@ -22,7 +30,6 @@ def download_file(doi, filename, data_path_root):
     r = requests.get(netcdf_url,stream=True)
     
     os.makedirs(data_path_root, exist_ok=True)
-    full_path = os.path.join(data_path_root, filename)
     
     #Download file with progress bar
     if r.status_code == 403:
@@ -38,12 +45,24 @@ def download_file(doi, filename, data_path_root):
                 if chunk:
                     f.write(chunk)
         return full_path
-    
-def download_and_extract(doi, filename, data_path_root, file_ext = '.tar.gz'):
-    full_path = download_file(doi, filename, data_path_root)
-    if full_path:
-        os.makedirs(full_path, exist_ok = True)
-        if file_ext == '.tar.gz':
+
+def get_true_folder_name_from_tarball(tar_path):
+    with tarfile.open(tar_path, "r:gz") as tar:
+        # Read first member
+        first_member = tar.getmembers()[0]
+        top = first_member.name.split("/")[0]
+    return top
+
+def download_and_extract(doi, filename, data_path_root, overwrite = False):
+    full_path = download_file(doi, filename, data_path_root, overwrite=overwrite)
+    if not os.path.exists(full_path):
+        raise ValueError("Issue downloading")
+
+    file_ext = filename.split(".", 1)[1]
+    if file_ext == 'tar.gz':
+        true_folder_name = get_true_folder_name_from_tarball(full_path)
+        extracted_folder_name = full_path.replace(filename, true_folder_name)
+        if not os.path.exists(extracted_folder_name):
             try:
                 with tarfile.open(full_path, 'r:gz') as tar:
                     tar.extractall(path=full_path)

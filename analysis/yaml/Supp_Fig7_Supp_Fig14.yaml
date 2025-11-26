@@ -2,11 +2,11 @@
 data_input: "default" # str["default", "seu1", "seu2"]
 save_data: TRUE
 
-seu1_name: "Kallisto50"  # Must have no spaces
-seu2_name: "Kallisto46"  # Must have no spaces
+seu1_name: "Full"  # Must have no spaces
+seu2_name: "Downsampled_reads"  # Must have no spaces
 
 # Input and output path specifications
-project_base_path: "/workspace/analysis"  # also used for locating script files; "/workspace/analysis" for docker image with repository mounted in /workspace; "/content/scrnaseq_packages_and_versioning/analysis" for Google Colab
+project_base_path: "/workspace/analysis"  # also used for locating script files; "/workspace/analysis" for docker image with repository mounted in /workspace
 data_name: "SC3_v3_NextGem_SI_PBMC_10K"  # str
 seurat_version: "5_0_2"  # str (with _ in place of .)
 conda_env: "analysis_env"
@@ -24,21 +24,21 @@ seu2_matrix_generation_method: "kb" # str["kb", "cellranger"]  # also used for l
 seu2_matrix_generation_method_version: "0_28_0"  # str (with _ in place of .)
 
 seu2_cell_fraction_after_downsampling: "1_0" # fraction of cells after downsampling - any number from (0,1.0] (with _ in place of .)   # also used for performing cell downsampling
-seu2_read_fraction_after_downsampling: "1_0" # fraction of reads after downsampling - any number from (0,1.0] (with _ in place of .)
-seu2_read_downsample_seed: 0 # random seqtk seed for downsampling reads - 0 for no downsampling, integer >1 for downsampled seed
+seu2_read_fraction_after_downsampling: "0_04" # fraction of reads after downsampling - any number from (0,1.0] (with _ in place of .)
+seu2_read_downsample_seed: 100 # random seqtk seed for downsampling reads - 0 for no downsampling, integer >1 for downsampled seed
 seu2_cell_downsample_seed: 0 # Sets the global R session seed during cell downsampling (does not affect the rest of the global R session)
 
 seu1_data_path: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}/{seu1_matrix_generation_method}{seu1_matrix_generation_method_version}/frac{seu1_read_fraction_after_downsampling}_seed{seu1_read_downsample_seed}")
-seu2_data_path: 'glue::glue("{project_base_path}/count_matrix_collection/{data_name}/kb0_28_0_kallisto46/frac{seu2_read_fraction_after_downsampling}_seed{seu2_read_downsample_seed}")'
+seu2_data_path: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}/{seu2_matrix_generation_method}{seu2_matrix_generation_method_version}/frac{seu2_read_fraction_after_downsampling}_seed{seu2_read_downsample_seed}")
 
 
 # Specifications for downloading data
-doi: ""  # For downloading from CaltechDATA (not yet implemented)
+doi: "10.22002/rwdfx-j4z76"  # For downloading from CaltechDATA
 seu1_file_link: "https://caltech.box.com/shared/static/cpe1z865jthijpo0ojwzxrjnshc9xioj.gz"  # For downloading from Box
-seu2_file_link: "https://caltech.box.com/shared/static/7dtnjv9c24yjuva146wi931qzb2ovpxk.gz"  # For downloading from Box
+seu2_file_link: "https://caltech.box.com/shared/static/8tkuv6rn69yjg3r3mlp2kim2r3m2zo7k.gz"  # For downloading from Box
 data_path_root: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}")
-seu1_data_name_from_download: "" # "" for default - glue::glue("{seu1_matrix_generation_method}{seu1_matrix_generation_method_version}_frac{seu1_read_fraction_after_downsampling}_seed{seu1_read_downsample_seed}")
-seu2_data_name_from_download: 'glue::glue("kb0_28_0_kallisto46_frac{seu2_read_fraction_after_downsampling}_seed{seu2_read_downsample_seed}")'
+seu1_data_name_from_download: "pbmc_kb0_28_0_frac1_0_seed0.tar.gz" # "" for default - glue::glue("{seu1_matrix_generation_method}{seu1_matrix_generation_method_version}_frac{seu1_read_fraction_after_downsampling}_seed{seu1_read_downsample_seed}")
+seu2_data_name_from_download: "pbmc_downsampled_kb0_28_0_frac0_04_seed100.tar.gz" # "" for default - glue::glue("{seu2_matrix_generation_method}{seu2_matrix_generation_method_version}_frac{seu2_read_fraction_after_downsampling}_seed{seu2_read_downsample_seed}")
 
 
 # Custom parameters
@@ -48,8 +48,8 @@ seu2_inflection_UMI_manual: "" # number >=0; or NULL to have automatic selection
 seu1_min_cells: 3
 seu1_min_features: 200
 
-seu2_min_cells: 3
-seu2_min_features: 200
+seu2_min_cells: ""  # "" for what was used in Figures
+seu2_min_features: ""  # "" for what was used in Figures
 
 max_pct_mct: 20 # default 5
 seu1_num_pcs: 50 # number 1-50; or NULL to select after elbow plot visualization
@@ -74,4 +74,4 @@ umap_umap_seed2: 42
 dpi: 300
 
 # Output path
-output_base_path: "glue::glue('{project_base_path}/output/{data_name}/seuratv{seurat_version}/input_{data_input}/kallisto50_vs_kallisto46/cell_fraction_1_0/read_fraction_1_0')" # "" for default - glue::glue("{project_base_path}/output/{data_name}/seuratv{seurat_version}/input_{data_input}/{matrix_generation_method_full}/cell_fraction_{cell_fraction_after_downsampling}/read_fraction_{read_fraction_after_downsampling}")
+output_base_path: "" # "" for default - glue::glue("{project_base_path}/output/{data_name}/seuratv{seurat_version}/input_{data_input}/{matrix_generation_method_full}/cell_fraction_{cell_fraction_after_downsampling}/read_fraction_{read_fraction_after_downsampling}")

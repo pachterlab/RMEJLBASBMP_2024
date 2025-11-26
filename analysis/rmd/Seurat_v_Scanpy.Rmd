@@ -6,7 +6,7 @@ date: "2024-01-01"
 
 Select yaml file
 ```{r}
-yaml_file <- "Fig1"  # Fig1, Supp_Fig2, Supp_Fig3, Supp_Fig4, Supp_Fig5, Supp_Fig18, Supp_Fig18_DE, Supp_Fig19, Supp_Fig19_DE
+yaml_file <- "Fig1_Fig4"  # Fig1_Fig4.yaml, Supp_Fig2, Fig4_Supp_Fig3_Supp_Fig15_Supp_Fig16, Supp_Fig4, Supp_Fig5, Supp_Fig20, Supp_Fig20_DE, Supp_Fig21, Supp_Fig21_DE
 do_celltyping <- TRUE
 ```
 

@@ -5,7 +5,7 @@ save_data: TRUE
 
 # Input and output path specifications
 project_base_path: "/workspace/analysis"  # also used for locating script files; "/workspace/analysis" for docker image with repository mounted in /workspace; "/content/scrnaseq_packages_and_versioning/analysis" for Google Colab
-data_name: "neuron_10k_v3"  # str
+data_name: "SC3_v3_NextGem_SI_PBMC_10K"  # str
 seurat_version: "5_0_2"  # str (with _ in place of .)
 scanpy_version: "1_9_5"  # str (with _ in place of .)
 conda_env: "analysis_env"
@@ -31,12 +31,12 @@ scan_data_path: "" # "" for default - glue::glue("{project_base_path}/count_matr
 
 
 # Specifications for downloading data
-doi: ""  # For downloading from CaltechDATA (not yet implemented)
-seu_file_link: "https://caltech.box.com/shared/static/nxktjg4v5e45hrcewxc3o96bt91j0chu.gz"  # For downloading from Box
-scan_file_link: "https://caltech.box.com/shared/static/nxktjg4v5e45hrcewxc3o96bt91j0chu.gz"  # For downloading from Box
+doi: "10.22002/rwdfx-j4z76"  # For downloading from CaltechDATA
+seu_file_link: "https://caltech.box.com/shared/static/cpe1z865jthijpo0ojwzxrjnshc9xioj.gz"  # For downloading from Box
+scan_file_link: "https://caltech.box.com/shared/static/cpe1z865jthijpo0ojwzxrjnshc9xioj.gz"  # For downloading from Box
 data_path_root: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}")
-seu_data_name_from_download: "" # "" for default - glue::glue("{seu_matrix_generation_method}{seu_matrix_generation_method_version}_frac{seu_read_fraction_after_downsampling}_seed{seu_read_downsample_seed}")
-scan_data_name_from_download: "" # "" for default - glue::glue("{scan_matrix_generation_method}{scan_matrix_generation_method_version}_frac{scan_read_fraction_after_downsampling}_seed{scan_read_downsample_seed}")
+seu_data_name_from_download: "pbmc_kb0_28_0_frac1_0_seed0.tar.gz" # "" for default - glue::glue("{seu_matrix_generation_method}{seu_matrix_generation_method_version}_frac{seu_read_fraction_after_downsampling}_seed{seu_read_downsample_seed}")
+scan_data_name_from_download: "pbmc_kb0_28_0_frac1_0_seed0.tar.gz" # "" for default - glue::glue("{scan_matrix_generation_method}{scan_matrix_generation_method_version}_frac{scan_read_fraction_after_downsampling}_seed{scan_read_downsample_seed}")
 
 
 # Custom parameters
@@ -65,7 +65,7 @@ umap_leiden_seed_seu: 42
 umap_leiden_seed_scan: 42
 umap_umap_seed_seu: 42
 umap_umap_seed_scan: 42
-model_pkl: "Mouse_Whole_Brain"
+model_pkl: "Immune_All_Low.pkl"
 
 dpi: 300
 

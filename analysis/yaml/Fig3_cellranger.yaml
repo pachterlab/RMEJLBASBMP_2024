@@ -33,12 +33,12 @@ seu2_data_path: "" # "" for default - glue::glue("{project_base_path}/count_matr
 
 
 # Specifications for downloading data
-doi: ""  # For downloading from CaltechDATA (not yet implemented)
+doi: "10.22002/rwdfx-j4z76"  # For downloading from CaltechDATA
 seu1_file_link: "https://caltech.box.com/shared/static/wgwatn23bk5pb8yuifk9mkcokb2zvg13.gz"  # For downloading from Box
 seu2_file_link: "https://caltech.box.com/shared/static/m73ih8e87arjxties9vjm8kq0fjx9wgb.gz"  # For downloading from Box
 data_path_root: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}")
-seu1_data_name_from_download: "" # "" for default - glue::glue("{seu1_matrix_generation_method}{seu1_matrix_generation_method_version}_frac{seu1_read_fraction_after_downsampling}_seed{seu1_read_downsample_seed}")
-seu2_data_name_from_download: 'glue::glue("{seu2_matrix_generation_method}{seu2_matrix_generation_method_version}_frac{seu2_read_fraction_after_downsampling}_seed{seu2_read_downsample_seed}")'
+seu1_data_name_from_download: "pbmc_cellranger7_2_0_frac1_0_seed0.tar.gz" # "" for default - glue::glue("{seu1_matrix_generation_method}{seu1_matrix_generation_method_version}_frac{seu1_read_fraction_after_downsampling}_seed{seu1_read_downsample_seed}")
+seu2_data_name_from_download: "pbmc_cellranger6_1_2_frac1_0_seed0.tar.gz"
 
 
 # Custom parameters

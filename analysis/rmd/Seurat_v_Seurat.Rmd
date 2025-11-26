@@ -12,7 +12,7 @@ params:
 
 Select yaml file
 ```{r}
-yaml_file <- "Supp_Stats_Bootstrap_Seurat"  # Fig3_cellranger, Supp_Fig7, Supp_Fig7_DE, Supp_Fig9, Supp_Fig13, Supp_Fig14, Supp_Fig15_seu, Supp_Seurat_version4, Supp_Stats_Bootstrap_Seurat
+yaml_file <- "Supp_Stats_Bootstrap_Seurat"  # Fig3_cellranger, Supp_Fig7_Supp_Fig14, Supp_Fig7_DE, Supp_Fig9, Supp_Fig13_Supp_Fig14, Supp_Fig17_seu, Supp_Seurat_version4, Supp_Stats_Bootstrap_Seurat
 ```
 
 Load contents of yaml file into global R environment

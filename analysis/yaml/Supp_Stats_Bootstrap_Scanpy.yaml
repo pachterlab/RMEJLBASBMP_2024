@@ -37,12 +37,12 @@ scan2_data_path: "" # "" for default - glue::glue("{project_base_path}/count_mat
 
 
 # Specifications for downloading data
-doi: ""  # For downloading from CaltechDATA (not yet implemented)
+doi: "10.22002/rwdfx-j4z76"  # For downloading from CaltechDATA
 scan1_file_link: "https://caltech.box.com/shared/static/cpe1z865jthijpo0ojwzxrjnshc9xioj.gz"  # For downloading from Box
 scan2_file_link: ""  # For downloading from Box
 data_path_root: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}")
-scan1_data_name_from_download: "" # "" for default - glue::glue("{scan1_matrix_generation_method}{scan1_matrix_generation_method_version}_frac{scan1_read_fraction_after_downsampling}_seed{scan1_read_downsample_seed}")
-scan2_data_name_from_download: "" # "" for default - glue::glue("{scan2_matrix_generation_method}{scan2_matrix_generation_method_version}_frac{scan2_read_fraction_after_downsampling}_seed{scan2_read_downsample_seed}")
+scan1_data_name_from_download: "pbmc_kb0_28_0_frac1_0_seed0.tar.gz" # "" for default - glue::glue("{scan1_matrix_generation_method}{scan1_matrix_generation_method_version}_frac{scan1_read_fraction_after_downsampling}_seed{scan1_read_downsample_seed}")
+scan2_data_name_from_download: 'glue::glue("pbmc_bootstrapped_frac1_0_seed{scan2_read_downsample_seed}.tar.gz")' # "" for default - glue::glue("{scan2_matrix_generation_method}{scan2_matrix_generation_method_version}_frac{scan2_read_fraction_after_downsampling}_seed{scan2_read_downsample_seed}")
 
 
 # Custom parameters

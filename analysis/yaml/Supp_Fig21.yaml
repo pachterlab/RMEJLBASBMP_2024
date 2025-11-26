@@ -1,6 +1,6 @@
 # Function argument and input settings
 analysis_methods: "default" # str["default", "seurat_like", "scanpy_like"]
-data_input: "seurat" # str["default", "seurat", "scanpy"]
+data_input: "default" # str["default", "seurat", "scanpy"]
 save_data: TRUE
 
 # Input and output path specifications
@@ -31,12 +31,12 @@ scan_data_path: "" # "" for default - glue::glue("{project_base_path}/count_matr
 
 
 # Specifications for downloading data
-doi: ""  # For downloading from CaltechDATA (not yet implemented)
+doi: "10.22002/rwdfx-j4z76"  # For downloading from CaltechDATA
 seu_file_link: "https://caltech.box.com/shared/static/a5sphencu59dmi5ueklsygtbtb3zftnk.gz"  # For downloading from Box
 scan_file_link: "https://caltech.box.com/shared/static/a5sphencu59dmi5ueklsygtbtb3zftnk.gz"  # For downloading from Box
 data_path_root: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}")
-seu_data_name_from_download: "" # "" for default - glue::glue("{seu_matrix_generation_method}{seu_matrix_generation_method_version}_frac{seu_read_fraction_after_downsampling}_seed{seu_read_downsample_seed}")
-scan_data_name_from_download: "" # "" for default - glue::glue("{scan_matrix_generation_method}{scan_matrix_generation_method_version}_frac{scan_read_fraction_after_downsampling}_seed{scan_read_downsample_seed}")
+seu_data_name_from_download: "vdj_v1_hs_nsclc_multi_5gex_t_b.tar.gz" # "" for default - glue::glue("{seu_matrix_generation_method}{seu_matrix_generation_method_version}_frac{seu_read_fraction_after_downsampling}_seed{seu_read_downsample_seed}")
+scan_data_name_from_download: "vdj_v1_hs_nsclc_multi_5gex_t_b.tar.gz" # "" for default - glue::glue("{scan_matrix_generation_method}{scan_matrix_generation_method_version}_frac{scan_read_fraction_after_downsampling}_seed{scan_read_downsample_seed}")
 
 
 # Custom parameters

@@ -15,9 +15,9 @@ conda_env: "analysis_env"
 
 # Specifications for downloading data
 download_data: TRUE
-doi: ""  # For downloading from CaltechDATA (not yet implemented)
+doi: "10.22002/rwdfx-j4z76"  # For downloading from CaltechDATA
 downsampled_data_file_link: "https://caltech.box.com/shared/static/etkjnv2mkwy0ic2zhtjtkuin597avnw5.gz"  # For downloading from Box
 data_path_root: ""  # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}")
-data_name_from_download: "downsampled_stats"  # str
+data_name_from_download: "downsampled_stats.tar.gz"  # str
 
 dpi: 300

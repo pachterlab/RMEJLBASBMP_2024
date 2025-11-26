@@ -301,7 +301,8 @@ upset_plot_general <- function(data, group1_name, group2_name, comparison, befor
     } else {
         if (save == TRUE || is.character(save)) {
             filepath <- make_save_path(filepath = save, default_filepath = default_plotpath)
-            tiff(filepath, width = 2300, height = 2100, res = dpi, bg = "white", units = "px")
+            # tiff(filepath, width = 2300, height = 2100, res = dpi, bg = "white", units = "px")
+            pdf(filepath, width = 2300 / dpi, height = 2100 / dpi, bg = "white")
             print(p)
             dev.off()
         }
@@ -2061,8 +2062,8 @@ create_volcano_plots <- function(data, output_base_path, package, dpi = 300) {
                 panel.grid.minor = element_line(color = "lightgray", linetype = "dotted")  # Minor grid lines
             )
         
-        # Save plot as TIFF
-        output_file <- file.path(output_base_path, paste0("volcano_", package, "_cluster_", clust, ".tiff"))
+        # Save plot as PDF
+        output_file <- file.path(output_base_path, paste0("volcano_", package, "_cluster_", clust, ".pdf"))
         ggsave(filename = output_file, plot = p, dpi = dpi, width = 6, height = 4, units = "in")
     }
     
@@ -2239,7 +2240,7 @@ make_volcano_jaccards_and_upsets <- function(markers2, make_upset_plots = TRUE) 
         data <- list(Seurat = genes_seurat, Scanpy = genes_scanpy)
         
         if (make_upset_plots) {
-            p <- upset_plot_general(data, group1_name = "Seurat", group2_name = "Scanpy", comparison = "Gene", as_ggplot = FALSE, save = glue("{output_base_path_biological_output}/upset_volcano_clust{clust}.tiff"))  #!!!! uncomment   
+            p <- upset_plot_general(data, group1_name = "Seurat", group2_name = "Scanpy", comparison = "Gene", as_ggplot = FALSE, save = glue("{output_base_path_biological_output}/upset_volcano_clust{clust}.pdf"))  #!!!! uncomment   
         }
     }
     

@@ -13,12 +13,12 @@ output_base_path: ""  # "" for default - glue::glue("{project_base_path}/output/
 
 dpi: 300
 
-doi: ""  # For downloading from CaltechDATA (not yet implemented)
+doi: "10.22002/rwdfx-j4z76"  # For downloading from CaltechDATA
 seuv5_version_control_file_link: "https://caltech.box.com/shared/static/8l5ggdz5bbrc9wdso8d6hsa2dvxv303s.gz"  # For downloading from Box
 seuv4_version_control_file_link: "https://caltech.box.com/shared/static/pdvw6s8d1sz4j0uu9xwrcqb10qekppmc.gz"  # For downloading from Box
 data_path_root: "/workspace/analysis/count_matrix_collection/SC3_v3_NextGem_SI_PBMC_10K/seurat_version_control"
-seuv5_data_name_from_download: "seuratv5"  # str
-seuv4_data_name_from_download: "seuratv4"  # str
+seuv5_data_name_from_download: "seuratv5.tar.gz"  # str
+seuv4_data_name_from_download: "seuratv4.tar.gz"  # str
 
 seu1_data_path: ""  # required if data_download == FALSE; optional if TRUE - for default - glue::glue("{data_path_root}/seuratv5/seu.rds")
 seu2_data_path: ""  # required if data_download == FALSE; optional if TRUE - for default - glue::glue("{data_path_root}/seuratv4/seu.rds")

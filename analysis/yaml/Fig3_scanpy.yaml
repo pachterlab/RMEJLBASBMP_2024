@@ -13,12 +13,12 @@ output_base_path: ""  # "" for default - glue::glue("{project_base_path}/output/
 
 dpi: 300
 
-doi: ""  # For downloading from CaltechDATA (not yet implemented)
+doi: "10.22002/rwdfx-j4z76"  # For downloading from CaltechDATA
 scanv1_9_version_control_file_link: "https://caltech.box.com/shared/static/33hnrouuj04be66597ztaaoww8dl3u0u.gz"  # For downloading from Box
 scanv1_4_version_control_file_link: "https://caltech.box.com/shared/static/tsek5fs050ctjy6i7i82rdcs3qhppo80.gz"  # For downloading from Box
 data_path_root: "/workspace/analysis/count_matrix_collection/SC3_v3_NextGem_SI_PBMC_10K/scanpy_version_control"
-scanv1_9_data_name_from_download: "scanpyv1_9"  # str
-scanv1_4_data_name_from_download: "scanpyv1_4"  # str
+scanv1_9_data_name_from_download: "scanpyv1_9.tar.gz"  # str
+scanv1_4_data_name_from_download: "scanpyv1_4.tar.gz"  # str
 
 scan1_all_genes_data_path: ""  # required if data_download == FALSE; optional if TRUE - "" for default - glue::glue("{data_path_root}/scanpyv1_9/adata_all_genes.h5ad")
 scan2_all_genes_data_path: ""  # required if data_download == FALSE; optional if TRUE - "" for default - glue::glue("{data_path_root}/scanpyv1_4/data_all_genes.h5ad")

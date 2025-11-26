@@ -28,12 +28,12 @@ scan2_read_fraction_after_downsampling: "0_04" # fraction of reads after downsam
 scan2_read_downsample_seed: 100 # random seqtk seed for downsampling reads - 0 for no downsampling, integer >1 for downsampled seed
 scan2_cell_downsample_seed: 0 # Sets the global R session seed during cell downsampling (does not affect the rest of the global R session)
 
-scan1_data_path: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}/{scan1_matrix_generation_method}{scan1_matrix_generation_method_version}/frac{scan1_read_fraction_after_downsampling}_seed{scan1_read_downsample_seed}")
-scan2_data_path: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}/{scan2_matrix_generation_method}{scan2_matrix_generation_method_version}/frac{scan2_read_fraction_after_downsampling}_seed{scan2_read_downsample_seed}")
+scan1_data_path: "pbmc_kb0_28_0_frac1_0_seed0.tar.gz" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}/{scan1_matrix_generation_method}{scan1_matrix_generation_method_version}/frac{scan1_read_fraction_after_downsampling}_seed{scan1_read_downsample_seed}")
+scan2_data_path: "pbmc_downsampled_kb0_28_0_frac0_04_seed100.tar.gz" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}/{scan2_matrix_generation_method}{scan2_matrix_generation_method_version}/frac{scan2_read_fraction_after_downsampling}_seed{scan2_read_downsample_seed}")
 
 
 # Specifications for downloading data
-doi: ""  # For downloading from CaltechDATA (not yet implemented)
+doi: "10.22002/rwdfx-j4z76"  # For downloading from CaltechDATA
 scan1_file_link: "https://caltech.box.com/shared/static/cpe1z865jthijpo0ojwzxrjnshc9xioj.gz"  # For downloading from Box
 scan2_file_link: "https://caltech.box.com/shared/static/8tkuv6rn69yjg3r3mlp2kim2r3m2zo7k.gz"  # For downloading from Box
 data_path_root: "" # "" for default - glue::glue("{project_base_path}/count_matrix_collection/{data_name}")

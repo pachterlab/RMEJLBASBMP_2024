@@ -6,7 +6,7 @@ date: "2024-01-01"
 
 Select yaml file
 ```{r}
-yaml_file <- "Supp_Fig20"  # Supp_Fig20
+yaml_file <- "Supp_Fig22"  # Supp_Fig22
 ```
 
 Load contents of yaml file into global R environment
