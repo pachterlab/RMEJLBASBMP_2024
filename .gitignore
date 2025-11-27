@@ -2,7 +2,10 @@
 **/reference_files/**
 **/data/**
 **/output/**
+**/data_original/**
+**/output_original/**
 **/count_matrix_collection/**
+**/count_matrix_collection_original/**
 
 **/*.pyc
 

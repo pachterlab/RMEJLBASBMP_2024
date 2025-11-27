@@ -6,7 +6,7 @@ date: "2024-01-01"
 
 Select yaml file
 ```{r}
-yaml_file <- "Fig2_Supp_Fig11_read"  # Fig2_Supp_Fig11_read, Fig2_Supp_Fig12_cell
+yaml_file <- "Fig2_Supp_Fig12_cell"  # Fig2_Supp_Fig11_read, Fig2_Supp_Fig12_cell
 ```
 
 Load contents of yaml file into global R environment
@@ -47,9 +47,9 @@ source(glue("{project_base_path}/scripts/data_analysis_helper.R"))
 ```
 
 ```{r}
-if (downsampled_data_file_link != "" && (!dir.exists(downsampled_data_path) || length(list.files(downsampled_data_path)) == 0)) {
-    downsampled_data_path <- download_box(downsampled_data_file_link, data_name_from_download, data_path_root)
-}
+# if (downsampled_data_file_link != "" && (!dir.exists(downsampled_data_path) || length(list.files(downsampled_data_path)) == 0)) {
+#     downsampled_data_path <- download_box(downsampled_data_file_link, data_name_from_download, data_path_root)
+# }
 ```
 
 ```{python}
@@ -880,8 +880,8 @@ aggregate_bar_chart <- ggplot(long_bar_chart, aes(x = Category, y = value, fill 
         text = element_text(family = "Arial"),
         legend.position = "none",
         legend.text = element_text(size = rel(1.45)),
-        axis.text.x = element_text(angle = 45, hjust = 1, size = rel(1.4)),
-        axis.title = element_text(size = rel(1.45))
+        axis.text.x = element_text(angle = 45, hjust = 1, size = rel(1.6)),
+        axis.title = element_text(size = rel(1.65))
     ) # Rotate x-axis labels if needed
 
 if (length(downsampled_seeds_list) > 1) {

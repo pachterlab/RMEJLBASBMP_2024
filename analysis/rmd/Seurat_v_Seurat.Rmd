@@ -12,7 +12,7 @@ params:
 
 Select yaml file
 ```{r}
-yaml_file <- "Supp_Stats_Bootstrap_Seurat"  # Fig3_cellranger, Supp_Fig7_Supp_Fig14, Supp_Fig7_DE, Supp_Fig9, Supp_Fig13_Supp_Fig14, Supp_Fig17_seu, Supp_Seurat_version4, Supp_Stats_Bootstrap_Seurat
+yaml_file <- "Fig3_cellranger"  # Fig3_cellranger, Supp_Fig7_Supp_Fig14, Supp_Fig7_DE, Supp_Fig9, Supp_Fig13_Supp_Fig14, Supp_Fig17_seu, Supp_Seurat_version4, Supp_Stats_Bootstrap_Seurat
 ```
 
 Load contents of yaml file into global R environment
@@ -350,13 +350,13 @@ seu_umap_metric <- "correlation"
 
 Download data if necessary
 ```{r}
-if (seu1_file_link != "" && (!dir.exists(seu1_data_path) || length(list.files(seu1_data_path)) == 0)) {
-    seu1_data_path <- download_box(seu1_file_link, seu1_data_name_from_download, data_path_root)
-}
-
-if (seu2_file_link != "" && (!dir.exists(seu2_data_path) || length(list.files(seu2_data_path)) == 0)) {
-    seu2_data_path <- download_box(seu2_file_link, seu2_data_name_from_download, data_path_root)
-}
+# if (seu1_file_link != "" && (!dir.exists(seu1_data_path) || length(list.files(seu1_data_path)) == 0)) {
+#     seu1_data_path <- download_box(seu1_file_link, seu1_data_name_from_download, data_path_root)
+# }
+# 
+# if (seu2_file_link != "" && (!dir.exists(seu2_data_path) || length(list.files(seu2_data_path)) == 0)) {
+#     seu2_data_path <- download_box(seu2_file_link, seu2_data_name_from_download, data_path_root)
+# }
 ```
 
 ```{python}

@@ -73,17 +73,17 @@ source(glue("{project_base_path}/scripts/plotting_and_stats.R"))
 
 Download data if necessary
 ```{r}
-if (seuv5_version_control_file_link != "" && (!dir.exists(dirname(seu1_data_path)) || length(list.files(dirname(seu1_data_path))) == 0)) {
-    seu1_data_path_base <- download_box(seuv5_version_control_file_link, seuv5_data_name_from_download, data_path_root)
-    seu1_data_path <- glue("{seu1_data_path_base}/seu.rds")
-    seu1_markers_data_path <- glue("{seu1_data_path_base}/markers.rds")
-}
-
-if (seuv4_version_control_file_link != "" && (!dir.exists(dirname(seu2_data_path)) || length(list.files(dirname(seu2_data_path))) == 0)) {
-    seu2_data_path_base <- download_box(seuv4_version_control_file_link, seuv4_data_name_from_download, data_path_root)
-    seu2_data_path <- glue("{seu2_data_path_base}/seu.rds")
-    seu2_markers_data_path <- glue("{seu2_data_path_base}/markers.rds")
-}
+# if (seu1_version_control_file_link != "" && (!dir.exists(dirname(seu1_data_path)) || length(list.files(dirname(seu1_data_path))) == 0)) {
+#     seu1_data_path_base <- download_box(seu1_version_control_file_link, seu1_data_name_from_download, data_path_root)
+#     seu1_data_path <- glue("{seu1_data_path_base}/seu.rds")
+#     seu1_markers_data_path <- glue("{seu1_data_path_base}/markers.rds")
+# }
+# 
+# if (seu2_version_control_file_link != "" && (!dir.exists(dirname(seu2_data_path)) || length(list.files(dirname(seu2_data_path))) == 0)) {
+#     seu2_data_path_base <- download_box(seu2_version_control_file_link, seu2_data_name_from_download, data_path_root)
+#     seu2_data_path <- glue("{seu2_data_path_base}/seu.rds")
+#     seu2_markers_data_path <- glue("{seu2_data_path_base}/markers.rds")
+# }
 ```
 
 ```{python}

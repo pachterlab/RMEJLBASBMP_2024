@@ -6,7 +6,7 @@ date: "2024-01-01"
 
 Select yaml file
 ```{r}
-yaml_file <- "Fig1_Fig4"  # Fig1_Fig4.yaml, Supp_Fig2, Fig4_Supp_Fig3_Supp_Fig15_Supp_Fig16, Supp_Fig4, Supp_Fig5, Supp_Fig20, Supp_Fig20_DE, Supp_Fig21, Supp_Fig21_DE
+yaml_file <- "Fig4_Supp_Fig3_Supp_Fig15_Supp_Fig16"  # Fig1_Fig4, Supp_Fig2, Fig4_Supp_Fig3_Supp_Fig15_Supp_Fig16, Supp_Fig4, Supp_Fig5, Supp_Fig20, Supp_Fig20_DE, Supp_Fig21, Supp_Fig21_DE
 do_celltyping <- TRUE
 ```
 
@@ -309,13 +309,13 @@ py_config()
 
 Download data if necessary
 ```{r}
-if (seu_file_link != "" && (!dir.exists(seu_data_path) || length(list.files(seu_data_path)) == 0)) {
-    seu_data_path <- download_box(seu_file_link, seu_data_name_from_download, data_path_root)
-}
-
-if (scan_file_link != "" && (!dir.exists(scan_data_path) || length(list.files(scan_data_path)) == 0)) {
-    scan_data_path <- download_box(scan_file_link, scan_data_name_from_download, data_path_root)
-}
+# if (seu_file_link != "" && (!dir.exists(seu_data_path) || length(list.files(seu_data_path)) == 0)) {
+#     seu_data_path <- download_box(seu_file_link, seu_data_name_from_download, data_path_root)
+# }
+# 
+# if (scan_file_link != "" && (!dir.exists(scan_data_path) || length(list.files(scan_data_path)) == 0)) {
+#     scan_data_path <- download_box(scan_file_link, scan_data_name_from_download, data_path_root)
+# }
 ```
 
 ```{python}
@@ -1558,11 +1558,12 @@ if r.do_celltyping:
     sc.pp.log1p(adata_scan_celltypist)
     
     # # use my own neighborhood graph
-    if not all(adata_scan_celltypist.obs_names == adata_seu_celltypist.obs_names):
-        adata_scan_celltypist = adata_scan_celltypist[adata_seu_celltypist.obs_names, :].copy()
-        adata_scan_celltypist.obsp["connectivities"] = adata.obsp["connectivities"]
-        adata_scan_celltypist.obsp["distances"] = adata.obsp["distances"]
-        adata_scan_celltypist.uns["neighbors"] = adata.uns["neighbors"]
+    if not all(adata_scan_celltypist.obs_names == adata.obs_names):
+        adata_scan_celltypist = adata_scan_celltypist[adata.obs_names, :].copy()
+    
+    adata_scan_celltypist.obsp["connectivities"] = adata.obsp["connectivities"]
+    adata_scan_celltypist.obsp["distances"] = adata.obsp["distances"]
+    adata_scan_celltypist.uns["neighbors"] = adata.uns["neighbors"]
     
     # sc.pp.highly_variable_genes(adata_scan_celltypist)
     # adata_scan_celltypist.layers["scaled"] = adata_scan_celltypist.X.toarray()
@@ -1572,7 +1573,7 @@ if r.do_celltyping:
     # sc.pp.neighbors(adata_scan_celltypist, n_neighbors=10, n_pcs=40)
     
     # run model
-    predictions = celltypist.annotate(adata_scan_celltypist, model=model_pkl, majority_voting=True)
+    predictions = celltypist.annotate(adata_scan_celltypist, model=r.model_pkl, majority_voting=True)
     pred_labels = predictions.predicted_labels[['majority_voting']]
     pred_labels = pred_labels.reindex(adata_scan_celltypist.obs_names)  # reorder to match adata_real.obs index
     adata_scan_celltypist.obs['celltype'] = pred_labels['majority_voting'].values
@@ -1643,7 +1644,7 @@ if r.do_celltyping:
         }
     }
     
-    predictions_seu = celltypist.annotate(adata_seu_celltypist, model=model_pkl, majority_voting=True)
+    predictions_seu = celltypist.annotate(adata_seu_celltypist, model=r.model_pkl, majority_voting=True)
     pred_labels_seu = predictions_seu.predicted_labels[['majority_voting']]
     pred_labels_seu = pred_labels_seu.reindex(adata_seu_celltypist.obs_names)  # reorder to match adata_real.obs index
     adata_seu_celltypist.obs['celltype'] = pred_labels_seu['majority_voting'].values
@@ -1671,8 +1672,8 @@ if r.do_celltyping:
     
     celltype_df = pd.concat(
         [
-            seu_celltypes.rename("seu_celltype"),
-            scan_celltypes.rename("scan_celltype")
+            seu_celltypes.rename("Seurat"),
+            scan_celltypes.rename("Scanpy")
         ],
         axis=1
     )
@@ -1685,10 +1686,10 @@ if (do_celltyping) {
     # df <- read.csv("celltypes.csv", header = TRUE, stringsAsFactors = FALSE)
     df <- py$celltype_df
     
-    print(mclust::adjustedRandIndex(df$seu_celltype, df$scan_celltype))  # ARI
-    print(mean(df$seu_celltype == df$scan_celltype))  # fraction of cells that agree
+    print(mclust::adjustedRandIndex(df$Seurat, df$Scanpy))  # ARI
+    print(mean(as.character(df$Seurat) == as.character(df$Scanpy)))  # fraction of cells that agree
     
-    wompwomp::plot_alluvial(df = df, graphing_columns = c("seu_celltype", "scan_celltype"), sorting_algorithm = "none", coloring_algorithm = "left", text_size = 15, axis_text_size = 25, axis_text_vjust = 0, min_text = 1e-12, output_plot_path = glue::glue("{output_base_path}/plots/celltype_alluvial.pdf"))
+    wompwomp::plot_alluvial(df = df, graphing_columns = c("Seurat", "Scanpy"), sorting_algorithm = "none", color_bands = TRUE, coloring_algorithm = "left", text_size = 15, axis_text_size = 25, axis_text_vjust = 0, min_text = 1e-12, output_plot_path = glue::glue("{output_base_path}/plots/celltype_alluvial.pdf"))
 }
 ```
 Done with CellTypist
@@ -1793,7 +1794,7 @@ if (save_data) {
 ```
 
 ```{r}
-if (yaml_file != "Supp_Fig3") {
+if (yaml_file != "Fig4_Supp_Fig3_Supp_Fig15_Supp_Fig16") {
     sessionInfo()
     stop("Additional biological analysis is only conducted on the conditions in Supp_Fig3 in the manuscript. It requires aligned clusters, so only the conditions from Supp_Fig3, Supp_Fig4, or Supp_Fig5 are suitable.")
 }
@@ -1805,7 +1806,7 @@ try:
 except ImportError:
     import subprocess
     print("gget is not installed. Installing it now...")
-    subprocess.check_call(["pip", "install", "gget==0.29.0"])
+    subprocess.check_call(["pip", "install", "gget==0.29.0", "--no-deps"])
     print("gget has been installed successfully!")
 ```
 
@@ -1820,6 +1821,7 @@ ensembl <- FALSE  # for the PBMC 10k data, this requires converting to gene symb
 
 ```{r}
 # Call the function with markers2, output base path, and custom dpi
+source(glue("{project_base_path}/scripts/plotting_and_stats.R"))
 for (package in c("Seurat", "Scanpy")) {
     create_volcano_plots(
       data = markers2,
@@ -1828,37 +1830,52 @@ for (package in c("Seurat", "Scanpy")) {
       dpi = dpi
     )
 }
+
+# # works, but not that useful
+# create_combined_volcano_plots(
+#     data = markers2,
+#     output_base_path = output_base_path_biological_output,
+#     dpi = dpi
+# )
 ```
 
 ```{r}
+# source(glue("{project_base_path}/scripts/plotting_and_stats.R"))
 make_volcano_jaccards_and_upsets(markers2, make_upset_plots=TRUE)
 ```
 
 Map from Ensembl --> gene symbols (gget enrichr only works with gene symbols) - write this file if it doesn't already exist
 ```{r}
-unique_genes_text_file_path <- glue("{output_base_path_biological_output}/unique_genes.txt")
-id_to_symbol_csv_path <- glue("{output_base_path_biological_output}/id_to_symbol.csv")
-    
-if (!ensembl && !file.exists(id_to_symbol_csv_path)) {
-    if (!file.exists(unique_genes_text_file_path)) {
-        unique_genes <- unlist(list(unique(markers2$gene)))  # make a list of unique Ensembl gene IDs from markers2
-        writeLines(unique_genes, unique_genes_text_file_path)
-    }
-    system(glue("python3 ../scripts/ensembl_to_symbol.py -i {unique_genes_text_file_path} -o {id_to_symbol_csv_path}"))
-}
+# unique_genes_text_file_path <- glue("{output_base_path_biological_output}/unique_genes.txt")
+# id_to_symbol_csv_path <- glue("{output_base_path_biological_output}/id_to_symbol.csv")
+#     
+# if (!ensembl && !file.exists(id_to_symbol_csv_path)) {
+#     if (!file.exists(unique_genes_text_file_path)) {
+#         unique_genes <- unlist(list(unique(markers2$gene)))  # make a list of unique Ensembl gene IDs from markers2
+#         writeLines(unique_genes, unique_genes_text_file_path)
+#     }
+#     system(glue("python3 ../scripts/ensembl_to_symbol.py -i {unique_genes_text_file_path} -o {id_to_symbol_csv_path}"))
+# }
 ```
 
 make a gene symbol column in markers2
 ```{r}
 if (!ensembl) {
-    # Load the CSV
-    gene_dict_df <- read.csv(id_to_symbol_csv_path, stringsAsFactors = FALSE)
+    # # Load the CSV
+    # gene_dict_df <- read.csv(id_to_symbol_csv_path, stringsAsFactors = FALSE)
+    # 
+    # # Convert to a named vector (dictionary)
+    # gene_dict <- setNames(gene_dict_df$Gene_Symbol, gene_dict_df$Ensembl_ID)
+    # 
+    # markers2 <- markers2 %>%
+    #   dplyr::mutate(gene_symbol = purrr::map_chr(gene, ~ gene_dict[[.x]] %||% NA_character_))
     
-    # Convert to a named vector (dictionary)
-    gene_dict <- setNames(gene_dict_df$Gene_Symbol, gene_dict_df$Ensembl_ID)
-    
-    markers2 <- markers2 %>%
-      dplyr::mutate(gene_symbol = purrr::map_chr(gene, ~ gene_dict[[.x]] %||% NA_character_))
+
+    # var_df <- py$adata$var %>% as.data.frame()
+    # names(var_df)[names(var_df) == "gene_symbols"] <- "gene_symbol"
+    # var_df$gene_ID <- rownames(var_df)
+    var_df <- seu[["RNA"]]@meta.data[, c("gene_id", "gene_symbol")]
+    markers2 <- markers2 %>% left_join(var_df[, c("gene_id", "gene_symbol")], by = c("gene" = "gene_id"))
 }
 ```
 
@@ -1867,7 +1884,8 @@ run gget enrichr
 databases <- c("pathway")  # c("pathway", "ontology", "celltypes")
 # gene_name_column <- if (ensembl) markers2$gene else markers2$gene_symbol
 # background_list <- as.list(unique(gene_name_column))
-make_volcano_go_plots(markers2, databases=databases, custom_background_list=NULL, ensembl=ensembl, save_kegg=FALSE)  # custom_background_list=background_list
+source(glue("{project_base_path}/scripts/plotting_and_stats.R"))
+make_volcano_go_plots(markers2, databases=databases, custom_background_list=NULL, ensembl=ensembl, save_kegg=FALSE, label_scatterplot_points=FALSE)  # custom_background_list=background_list
 ```
 
 ```{r}

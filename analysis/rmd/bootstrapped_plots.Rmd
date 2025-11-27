@@ -49,9 +49,9 @@ source(glue("{project_base_path}/scripts/data_analysis_helper.R"))
 ```
 
 ```{r}
-if (bootstrapped_data_file_link != "" && (!dir.exists(bootstrapped_data_path) || length(list.files(bootstrapped_data_path)) == 0)) {
-    bootstrapped_data_path <- download_box(bootstrapped_data_file_link, data_name_from_download, data_path_root)
-}
+# if (bootstrapped_data_file_link != "" && (!dir.exists(bootstrapped_data_path) || length(list.files(bootstrapped_data_path)) == 0)) {
+#     bootstrapped_data_path <- download_box(bootstrapped_data_file_link, data_name_from_download, data_path_root)
+# }
 ```
 
 ```{python}

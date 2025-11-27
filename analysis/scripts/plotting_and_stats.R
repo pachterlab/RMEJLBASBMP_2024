@@ -301,8 +301,16 @@ upset_plot_general <- function(data, group1_name, group2_name, comparison, befor
     } else {
         if (save == TRUE || is.character(save)) {
             filepath <- make_save_path(filepath = save, default_filepath = default_plotpath)
-            # tiff(filepath, width = 2300, height = 2100, res = dpi, bg = "white", units = "px")
-            pdf(filepath, width = 2300 / dpi, height = 2100 / dpi, bg = "white")
+            ext <- tolower(tools::file_ext(filepath))
+            if (ext %in% c("tif", "tiff")) {
+                tiff(filepath, width = 2300, height = 2100, res = dpi, bg = "white", units = "px")
+            } else if (ext == "pdf") {
+                pdf(filepath, width = 2300 / dpi, height = 2100 / dpi, bg = "white")
+            } else if (ext == "png") {
+                png(filepath, width = 2300, height = 2100, res = dpi, bg = "white", units = "px")
+            } else {
+                stop("Unsupported file extension: ", ext)
+            }
             print(p)
             dev.off()
         }
@@ -596,7 +604,7 @@ plot_scatterplot_de_wilcoxon <- function(markers2, metric, outliers_excluded = F
             text = element_text(family = "Arial"), 
             plot.title = element_blank(),          # Increase plot title size
             axis.text = element_text(size = rel(axis_numbering_size)), # Increase axis tick labels size
-            axis.title = element_text(size = rel(axis_text_size))         # Increase axis text size
+            axis.title = element_text(size = 24)         # Increase axis text size
         )
     
     # show spearman correlation
@@ -619,6 +627,18 @@ plot_scatterplot_de_wilcoxon <- function(markers2, metric, outliers_excluded = F
         ymin_inset <- -10
         ymax_inset <- 140
     }
+    
+    # draw rectangle to indicate inset
+    p <- p +
+        annotate(
+            "rect",
+            xmin = 0, xmax = 10,
+            ymin = 0, ymax = 10,
+            fill = NA,      # no fill
+            color = "black",
+            linewidth = 0.3 # thin line
+        )
+    
 
     df_inset <- markers2 %>% filter((log_p_val_adj_1 <= 10) & (log_p_val_adj_2 <= 10))
 
@@ -717,7 +737,7 @@ plot_scatterplot_de_logfc <- function(markers2, outliers_excluded = FALSE, show_
             plot.title = element_blank(),          # Increase plot title size
             plot.margin = margin(l = 5, r = 11.5, b = bottom_margin, t = top_margin),
             axis.text = element_text(size = rel(axis_numbering_size)),
-            axis.title = element_text(size = rel(axis_text_size))
+            axis.title = element_text(size = 24)
         )
     
     if (max_value > 20) {
@@ -742,9 +762,9 @@ plot_scatterplot_de_logfc <- function(markers2, outliers_excluded = FALSE, show_
                 x = Inf,  # Places the annotation on the far right
                 y = -Inf, # Places the annotation on the bottom
                 label = glue::glue("CCC = {sprintf('%.2f', ccc)}"),
-                hjust = 1.04, # Align text to the right
-                vjust = -0.28,  # Align text to the bottom
-                size = 5.2
+                hjust = 1.1, # Align text to the right
+                vjust = -0.5,  # Align text to the bottom
+                size = 7
             )
     }
     
@@ -771,12 +791,15 @@ plot_scatterplot_de_logfc <- function(markers2, outliers_excluded = FALSE, show_
     } else {
         p <- p +
             geom_abline(slope = 1, intercept = 0, linetype = 2, color = "black", show.legend = FALSE, linewidth = 0.5)
+            # annotate("text", x = -max_value * 0.88, y = -max_value * 0.92, label = "y = x", hjust = 0.2, vjust = 1.2, size = 7)
         if (!outliers_excluded && ((m / m_filtered < 0.95 || m / m_filtered > 1.05) || (b / b_filtered < 0.95 || b / b_filtered > 1.05))) {
             p <- p +
                 geom_abline(slope = m_filtered, intercept = b_filtered, linewidth = 0.5, color = "black", linetype = 1)
+                # annotate("text", x = -max_value * 0.90, y = m_filtered * (-max_value * 0.90) + , label = baseline_pca_model, hjust = 0, vjust = 1.5, size = 7)
         } else {
             p <- p +
                 geom_abline(slope = m, intercept = b, linewidth = 0.5, linetype = 1, show.legend = FALSE, color = "black")
+                # annotate("text", x = -max_value * 0.90, y = m * (-max_value * 0.90) + b, label = baseline_pca_model, hjust = 0, vjust = 1.5, size = 7)
         }
     }
     
@@ -2034,6 +2057,11 @@ create_volcano_plots <- function(data, output_base_path, package, dpi = 300) {
         subset_data$color[subset_data[[logfc_col]] >= 1 & subset_data[[pval_col]] < 0.05] <- "red"
         subset_data$color[subset_data[[logfc_col]] <= -1 & subset_data[[pval_col]] < 0.05] <- "blue"
         
+        # Calculate number in each category
+        n_up     <- sum(subset_data[[logfc_col]] >= 1 & subset_data[[pval_col]] < 0.05)
+        n_down   <- sum(subset_data[[logfc_col]] <= -1 & subset_data[[pval_col]] < 0.05)
+        n_normal <- sum(subset_data$color == "gray")
+        
         # Create volcano plot
         p <- ggplot(subset_data, aes(x = !!logFC, y = neg_log10_pval)) +
             geom_point(aes(color = color), alpha = 0.6) +
@@ -2051,20 +2079,43 @@ create_volcano_plots <- function(data, output_base_path, package, dpi = 300) {
                 labels = c(0, 1, 2, 3, 4, "≤5")  # Custom label for the top value
             ) +
             labs(
-                title = glue("{package} Cluster {clust}"),
-                x = expression(Log[2] ~ "Fold Change"),
-                y = expression(-Log[10] ~ "Adjusted P-Value")
+                # title = glue("{package}"),
+                x = expression(Log[2] ~ "FC"),
+                y = expression(-Log[10] ~ "Adj. P-Value")
+            ) +
+            # ---- NEW: Print n_up on the far right (red) ----
+            annotate(
+                "text",
+                x = 10,                               # far right of your x-axis range
+                y = -log10(0.05) + 0.3,               # slightly above dashed line
+                label = n_up,
+                color = "red",
+                hjust = 1,
+                size = 7.5
+            ) +
+                
+                # ---- NEW: Print n_down on the far left (blue) ----
+            annotate(
+                "text",
+                x = -10,                              # far left of your x-axis range
+                y = -log10(0.05) + 0.3,
+                label = n_down,
+                color = "blue",
+                hjust = 0,
+                size = 7.5
             ) +
             theme_minimal(base_size = 14) +
             theme(
+                text = element_text(family = "Arial"),
                 plot.background = element_rect(fill = "white", color = NA),  # White background
-                plot.title = element_text(hjust = 0.5),  # Center title
+                plot.title = element_text(hjust = 0.5, size = 28),  # Center title
+                axis.title = element_text(size = 24),
                 panel.grid.minor = element_line(color = "lightgray", linetype = "dotted")  # Minor grid lines
             )
         
         # Save plot as PDF
-        output_file <- file.path(output_base_path, paste0("volcano_", package, "_cluster_", clust, ".pdf"))
-        ggsave(filename = output_file, plot = p, dpi = dpi, width = 6, height = 4, units = "in")
+        output_file <- file.path(output_base_path, paste0("volcano_", package, "_cluster_", clust, ".png"))  # ".pdf"
+        ggsave(filename = output_file, plot = p, dpi = dpi, width = 6, height = 4, units = "in")  # device=cairo_pdf (must run library(Cairo) first)
     }
     
     message("Volcano plots saved to: ", output_base_path)
@@ -2169,7 +2220,7 @@ run_gget_enrichr <- function(genes_list, databases, filename_base, output_base_p
 }
 
 
-make_volcano_go_plots <- function(markers2, databases = NULL, ensembl=FALSE, custom_background_list=NULL, save_kegg=FALSE) {
+make_volcano_go_plots <- function(markers2, databases = NULL, ensembl=FALSE, custom_background_list=NULL, save_kegg=FALSE, label_scatterplot_points=FALSE) {
     dir.create(output_base_path, recursive = TRUE, showWarnings = FALSE)
     
     gene_name_column <- if (ensembl) markers2$gene else markers2$gene_symbol
@@ -2178,6 +2229,8 @@ make_volcano_go_plots <- function(markers2, databases = NULL, ensembl=FALSE, cus
     clusters <- unique(markers2$cluster)
     
     # Loop over each cluster
+    log_file <- glue("{output_base_path_biological_output}/enrichr_discrepancies_log.txt")
+    write("", file = log_file)  # wipe it
     for (clust in clusters) {
         # Subset data for the current cluster
         subset_data <- markers2[markers2$cluster == clust, ]
@@ -2196,6 +2249,116 @@ make_volcano_go_plots <- function(markers2, databases = NULL, ensembl=FALSE, cus
         
         enrichr_filename_base = glue("enrichr_scanpy_cluster{clust}")
         run_gget_enrichr(genes_scanpy, databases=databases, filename_base=enrichr_filename_base, output_base_path_biological_output=output_base_path_biological_output, custom_background_list=custom_background_list, save_kegg=save_kegg, ensembl=ensembl)  # custom_background_list=background_list
+        
+        for (database in databases) {
+            df_seu <- read.csv(glue("{output_base_path_biological_output}/enrichr_seurat_cluster{clust}_{database}.csv"))
+            df_scan <- read.csv(glue("{output_base_path_biological_output}/enrichr_scanpy_cluster{clust}_{database}.csv"))
+            
+            df_combined <- df_seu %>%
+                select(path_name, adj_p_val_seu = adj_p_val) %>%
+                inner_join(
+                    df_scan %>% select(path_name, adj_p_val_scan = adj_p_val),
+                    by = "path_name"
+                )
+            
+            df_combined <- df_combined %>%
+                mutate(
+                    sig_seu  = adj_p_val_seu  < 0.05,
+                    sig_scan = adj_p_val_scan < 0.05,
+                    adj_p_val_seu  = pmax(adj_p_val_seu, 1e-50),
+                    adj_p_val_scan = pmax(adj_p_val_scan, 1e-50),
+                    neglog_seu  = -log10(adj_p_val_seu),
+                    neglog_scan = -log10(adj_p_val_scan)
+                )
+            
+            n_top_left     <- sum(!df_combined$sig_seu & df_combined$sig_scan)
+            n_bottom_right <- sum(df_combined$sig_seu & !df_combined$sig_scan)
+            
+            # print and write specific ones
+            seu_only_str <- paste(sort(df_combined$path_name[df_combined$sig_seu & !df_combined$sig_scan]), collapse = ", ")
+            scan_only_str <- paste(sort(df_combined$path_name[!df_combined$sig_seu & df_combined$sig_scan]), collapse = ", ")
+            
+            msg_seu  <- glue("Cluster {clust}, database {database}, Seurat-only {n_bottom_right}: {seu_only_str}")
+            msg_scan <- glue("Cluster {clust}, database {database}, Scanpy-only {n_top_left}: {scan_only_str}")
+            
+            # Print to console
+            cat(msg_seu,  "\n")
+            cat(msg_scan, "\n")
+            
+            # Write to file
+            write(msg_seu,  file = log_file, append = TRUE)
+            write(msg_scan, file = log_file, append = TRUE)
+            
+            write.csv(df_combined, glue("{output_base_path_biological_output}/enrichr_combined_cluster{clust}_{database}.csv"), row.names = FALSE)
+            
+            p <- ggplot(df_combined, aes(x = neglog_seu, y = neglog_scan)) +
+                geom_point(size = 2, alpha = 0.5) +
+                geom_vline(xintercept = -log10(0.05), linetype = "dashed", color = "gray") +
+                geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray") +
+                xlab(bquote(-log[10]*"(Seurat adj. p-value)")) +
+                ylab(bquote(-log[10]*"(Scanpy adj. p-value)")) +
+                labs(title = glue("Enrichr {database}")) +
+                annotate("text",
+                         x = max(df_combined$neglog_seu),
+                         y = min(df_combined$neglog_scan),
+                         label = glue("Seurat only: {n_bottom_right}"),  # n_bottom_right,  # glue("Seurat only: {n_bottom_right}"),
+                         color = "black",  # darkred
+                         size = 7,
+                         hjust = 1
+                ) +
+                annotate("text",
+                         x = min(df_combined$neglog_seu),
+                         y = max(df_combined$neglog_scan),
+                         label = glue("Scanpy only: {n_top_left}"),  # n_top_left,  # glue("Scanpy only: {n_top_left}"),
+                         color = "black",  # darkred, darkblue
+                         size = 7,
+                         hjust = 0
+                ) +
+                theme_bw(12) +
+                theme(
+                    axis.title = element_text(size = 24),
+                    plot.title      = element_text(size = 28, hjust = 0.5)
+                )
+            
+            if (label_scatterplot_points) {
+                p <- p +
+                    # ggrepel::geom_text_repel(
+                    #     data = df_combined %>% filter(sig_seu & !sig_scan),
+                    #     aes(label = path_name),
+                    #     color = "darkred",
+                    #     size = 3,
+                    #     force = 6,
+                    #     max.overlaps = Inf,
+                    #     min.segment.length = 0
+                    # ) +
+                    # ggrepel::geom_text_repel(
+                    #     data = df_combined %>% filter(!sig_seu & sig_scan),
+                    #     aes(label = path_name),
+                    #     color = "darkblue",
+                    #     size = 3,
+                    #     force = 6,
+                    #     max.overlaps = Inf,
+                    #     min.segment.length = 0
+                    # ) +
+                    ggrepel::geom_text_repel(
+                        data = df_combined %>% filter((sig_seu & !sig_scan) | (!sig_seu & sig_scan)),
+                        aes(label = path_name),
+                        color = "darkred",
+                        size = 3.5,
+                        force = 4,
+                        max.overlaps = 18,
+                        min.segment.length = 0
+                    )
+            }
+            
+            ggsave(
+                filename = glue("{output_base_path_biological_output}/enrichr_cluster{clust}_{database}_scatterplot.pdf"),
+                plot = p,
+                width = 6,
+                height = 6
+            )
+            
+        }
         
         print(glue("Done with cluster {clust}"))
     }
@@ -2240,7 +2403,7 @@ make_volcano_jaccards_and_upsets <- function(markers2, make_upset_plots = TRUE) 
         data <- list(Seurat = genes_seurat, Scanpy = genes_scanpy)
         
         if (make_upset_plots) {
-            p <- upset_plot_general(data, group1_name = "Seurat", group2_name = "Scanpy", comparison = "Gene", as_ggplot = FALSE, save = glue("{output_base_path_biological_output}/upset_volcano_clust{clust}.pdf"))  #!!!! uncomment   
+            p <- upset_plot_general(data, group1_name = "Seurat", group2_name = "Scanpy", comparison = "Gene", as_ggplot = FALSE, save = glue("{output_base_path_biological_output}/upset_volcano_clust{clust}.png"))  #!!!! uncomment   
         }
     }
     
@@ -2259,3 +2422,140 @@ make_volcano_jaccards_and_upsets <- function(markers2, make_upset_plots = TRUE) 
     )
     writeLines(output_lines, con = output_file)
 }
+
+
+create_combined_volcano_plots <- function(data, output_base_path, dpi = 300) {
+    
+    dir.create(output_base_path, recursive = TRUE, showWarnings = FALSE)
+    
+    clusters <- unique(data$cluster)
+    
+    for (clust in clusters) {
+        
+        # ----------------------------
+        # Subset cluster data
+        # ----------------------------
+        df <- subset(data, cluster == clust)
+        
+        # Compute capped −log10 p-values
+        df <- df %>%
+            mutate(
+                neglog_r  = pmin(-log10(p_val_adj_r), 5),
+                neglog_py = pmin(-log10(p_val_adj_py), 5)
+            )
+        
+        # ----------------------------
+        # Assign significance colors
+        # ----------------------------
+        df$color_r  <- "gray"
+        df$color_py <- "gray"
+        
+        df$color_r[df$logFC_r >=  1 & df$p_val_adj_r < 0.05] <- "red"
+        df$color_r[df$logFC_r <= -1 & df$p_val_adj_r < 0.05] <- "blue"
+        
+        df$color_py[df$logFC_py >=  1 & df$p_val_adj_py < 0.05] <- "red"
+        df$color_py[df$logFC_py <= -1 & df$p_val_adj_py < 0.05] <- "blue"
+        
+        # ------------------------------------------
+        # Determine which genes get connecting lines
+        # (significant in either method)
+        # ------------------------------------------
+        df$significant_any <- (
+            df$color_r != "gray" |
+                df$color_py != "gray"
+        )
+        
+        df_lines <- df[df$significant_any, ]   # ONLY red/blue genes
+        
+        # ----------------------------
+        # Build long-format for points
+        # ----------------------------
+        long_df <- bind_rows(
+            df %>% transmute(
+                gene, cluster,
+                method = "Seurat",
+                logFC  = logFC_r,
+                neglog = neglog_r,
+                color  = color_r
+            ),
+            df %>% transmute(
+                gene, cluster,
+                method = "Scanpy",
+                logFC  = logFC_py,
+                neglog = neglog_py,
+                color  = color_py
+            )
+        )
+        
+        # ----------------------------
+        # Create plot
+        # ----------------------------
+        p <- ggplot() +
+            
+            # Draw connecting lines only for red/blue points
+            geom_segment(
+                data = df_lines,
+                aes(
+                    x = logFC_r,  y = neglog_r,
+                    xend = logFC_py, yend = neglog_py
+                ),
+                color = "lightgray",
+                alpha = 0.7,
+                linewidth = 0.5
+            ) +
+            
+            # Points
+            geom_point(
+                data = long_df,
+                aes(x = logFC, y = neglog, color = color, shape = method),
+                alpha = 0.85,
+                size = 2
+            ) +
+            
+            scale_color_identity() +
+            scale_shape_manual(values = c(Seurat = 16, Scanpy = 17)) +
+            
+            geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "black") +
+            geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +
+            
+            scale_x_continuous(
+                limits = c(-10, 10),
+                breaks = seq(-10, 10, 2),
+                minor_breaks = seq(-10, 10, 1)
+            ) +
+            scale_y_continuous(
+                limits = c(0, 5),
+                breaks = seq(0, 5, 1),
+                labels = c(0,1,2,3,4,"≤5")
+            ) +
+            
+            labs(
+                title = paste0("Combined Volcano Plot — Cluster ", clust),
+                x = expression(Log[2] ~ "Fold Change"),
+                y = expression(-Log[10] ~ "Adjusted P-Value"),
+                shape = "Method"
+            ) +
+            
+            theme_minimal(base_size = 14) +
+            theme(
+                text = element_text(family = "Arial"),
+                plot.background = element_rect(fill = "white", color = NA),
+                plot.title = element_text(hjust = 0.5),
+                panel.grid.minor = element_line(color = "lightgray", linetype = "dotted")
+            )
+        
+        # ----------------------------
+        # Save
+        # ----------------------------
+        output_file <- file.path(
+            output_base_path,
+            paste0("combined_volcano_cluster_", clust, ".png")
+        )
+        
+        ggsave(output_file, p, dpi = dpi, width = 7, height = 5, units = "in")
+        message("Saved combined volcano: ", output_file)
+    }
+    
+    message("All combined volcano plots saved to: ", output_base_path)
+}
+

@@ -357,13 +357,13 @@ scanpy_correction_method <- "benjamini-hochberg"
 
 Download data if necessary
 ```{r}
-if (scan1_file_link != "" && (!dir.exists(scan1_data_path) || length(list.files(scan1_data_path)) == 0)) {
-    scan1_data_path <- download_box(scan1_file_link, scan1_data_name_from_download, data_path_root)
-}
-
-if (scan2_file_link != "" && (!dir.exists(scan2_data_path) || length(list.files(scan2_data_path)) == 0)) {
-    scan2_data_path <- download_box(scan2_file_link, scan2_data_name_from_download, data_path_root)
-}
+# if (scan1_file_link != "" && (!dir.exists(scan1_data_path) || length(list.files(scan1_data_path)) == 0)) {
+#     scan1_data_path <- download_box(scan1_file_link, scan1_data_name_from_download, data_path_root)
+# }
+# 
+# if (scan2_file_link != "" && (!dir.exists(scan2_data_path) || length(list.files(scan2_data_path)) == 0)) {
+#     scan2_data_path <- download_box(scan2_file_link, scan2_data_name_from_download, data_path_root)
+# }
 ```
 
 ```{python}

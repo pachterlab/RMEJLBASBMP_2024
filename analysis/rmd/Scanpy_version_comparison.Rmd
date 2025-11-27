@@ -76,19 +76,19 @@ source(glue("{project_base_path}/scripts/plotting_and_stats.R"))
 
 Download data if necessary
 ```{r}
-if (scanv1_9_version_control_file_link != "" && (!dir.exists(dirname(scan1_data_path)) || length(list.files(dirname(scan1_data_path))) == 0)) {
-    scan1_data_path_base <- download_box(scanv1_9_version_control_file_link, scanv1_9_data_name_from_download, data_path_root)
-    scan1_data_path <- glue("{scan1_data_path_base}/adata.h5ad")
-    scan1_all_genes_data_path <- glue("{scan1_data_path_base}/adata_all_genes.h5ad")
-    scan1_markers_data_path <- glue("{scan1_data_path_base}/markers.rds")
-}
-
-if (scanv1_4_version_control_file_link != "" && (!dir.exists(dirname(scan2_data_path)) || length(list.files(dirname(scan2_data_path))) == 0)) {
-    scan2_data_path_base <- download_box(scanv1_4_version_control_file_link, scanv1_4_data_name_from_download, data_path_root)
-    scan2_data_path <- glue("{scan2_data_path_base}/adata.h5ad")
-    scan2_all_genes_data_path <- glue("{scan2_data_path_base}/adata_all_genes.h5ad")
-    scan2_markers_data_path <- glue("{scan2_data_path_base}/markers.rds")
-}
+# if (scan1_version_control_file_link != "" && (!dir.exists(dirname(scan1_data_path)) || length(list.files(dirname(scan1_data_path))) == 0)) {
+#     scan1_data_path_base <- download_box(scan1_version_control_file_link, scan1_data_name_from_download, data_path_root)
+#     scan1_data_path <- glue("{scan1_data_path_base}/adata.h5ad")
+#     scan1_all_genes_data_path <- glue("{scan1_data_path_base}/adata_all_genes.h5ad")
+#     scan1_markers_data_path <- glue("{scan1_data_path_base}/markers.rds")
+# }
+# 
+# if (scan2_version_control_file_link != "" && (!dir.exists(dirname(scan2_data_path)) || length(list.files(dirname(scan2_data_path))) == 0)) {
+#     scan2_data_path_base <- download_box(scan2_version_control_file_link, scan2_data_name_from_download, data_path_root)
+#     scan2_data_path <- glue("{scan2_data_path_base}/adata.h5ad")
+#     scan2_all_genes_data_path <- glue("{scan2_data_path_base}/adata_all_genes.h5ad")
+#     scan2_markers_data_path <- glue("{scan2_data_path_base}/markers.rds")
+# }
 ```
 
 ```{python}
@@ -97,13 +97,13 @@ sys.path.append(f"{r.project_base_path}/scripts")
 from download_data import *
 
 if not r.doi == "" and not os.path.exists(os.path.dirname(r.scan1_data_path)) or not os.listdir(os.path.dirname(r.scan1_data_path)):  
-    r.scan1_data_path_base = download_and_extract(r.doi, r.scanv1_9_data_name_from_download, r.data_path_root)
+    r.scan1_data_path_base = download_and_extract(r.doi, r.scan1_data_name_from_download, r.data_path_root)
     r.scan1_data_path = f"{r.scan1_data_path_base}/adata.h5ad"
     r.scan1_all_genes_data_path <- f"{r.scan1_data_path_base}/adata_all_genes.h5ad"
     r.scan1_markers_data_path = f"{r.scan1_data_path_base}/markers.rds"
     
 if not r.doi == "" and not os.path.exists(os.path.dirname(r.scan2_data_path)) or not os.listdir(os.path.dirname(r.scan2_data_path)):  
-    r.scan2_data_path_base = download_and_extract(r.doi, r.scanv1_4_data_name_from_download, r.data_path_root)
+    r.scan2_data_path_base = download_and_extract(r.doi, r.scan2_data_name_from_download, r.data_path_root)
     r.scan2_data_path = f"{r.scan2_data_path_base}/adata.h5ad"
     r.scan2_all_genes_data_path <- f"{r.scan2_data_path_base}/adata_all_genes.h5ad"
     r.scan2_markers_data_path = f"{r.scan2_data_path_base}/markers.rds"
